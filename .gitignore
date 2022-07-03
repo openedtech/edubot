@@ -12,6 +12,7 @@ env3/
 *.db
 store/
 
+GREETING
 # Config file
 #config.yaml
 
