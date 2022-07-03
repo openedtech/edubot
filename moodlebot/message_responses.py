@@ -49,13 +49,10 @@ class Message:
             await self._respond()
 
     def _check_if_response(self):
-        if "moodlebot" in self.message_content.lower():
-            return True
-
         if self.room.member_count <= 2:
             return True
 
-        if random() < 0.5:
+        if "moodlebot" in self.message_content.lower() and random() < 0.5:
             return True
 
         return False
