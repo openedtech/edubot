@@ -69,4 +69,4 @@ class Message:
         username = self.event.sender[1:].split(":")[0]
         response = gpt.process_query(messages, username + ": " + self.message_content.lower())
 
-        await send_text_to_room(self.client, self.room.room_id, response)
+        await send_text_to_room(self.client, self.room.room_id, response, markdown_convert=False)
