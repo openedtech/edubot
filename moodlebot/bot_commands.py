@@ -43,7 +43,7 @@ class Command:
 
     async def process(self):
         """Process the command"""
-        if len(self.command_and_args.split()) > 0:
+        if len(self.command_and_args) > 0:
             self.args = self.command_and_args[1:]
 
         if self.event.sender not in g.config.admins:
