@@ -52,7 +52,7 @@ class Message:
         if self.room.member_count <= 2:
             return True
 
-        if "moodlebot" in self.message_content.lower() or random() < 0.5:
+        if "moodlebot" in self.message_content.lower() or random() < 0.05:
             return True
 
         return False
