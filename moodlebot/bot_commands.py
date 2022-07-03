@@ -36,7 +36,7 @@ class Command:
         self.store = store
         self.config = config
         self.command_and_args = command_and_args.split()
-        self.command = command_and_args[0]
+        self.command = self.command_and_args[0]
         self.room = room
         self.event = event
         self.args = []
