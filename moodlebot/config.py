@@ -126,7 +126,6 @@ class Config:
         self.command_prefix = self._get_cfg(["command_prefix"], default="!c") + " "
 
         self.original_prompt = self._get_cfg(["original_prompt"], required=True)
-        self.admin_help = self._get_cfg(["admin_help"], required=True)
         self.admins = self._get_cfg(["admins"], required=True)
 
     def _get_cfg(
