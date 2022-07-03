@@ -1,7 +1,7 @@
 import logging
 from random import random
 
-from nio import AsyncClient, MatrixRoom, RoomMessageText
+from nio import AsyncClient, MatrixRoom, RoomMessageText, RoomMessagesError
 
 from moodlebot import gpt, g
 from moodlebot.chat_functions import send_text_to_room
@@ -68,6 +68,9 @@ class Message:
             limit = 200
 
         messages = await self.client.room_messages(self.room.room_id, self.client.loaded_sync_token, limit=limit)
+        if isinstance(messages, RoomMessagesError):
+            logger.error(f"Could not read room of id: {self.room.room_id}")
+            return
         username = self.event.sender[1:].split(":")[0]
         response = gpt.process_query(messages, username + ": " + self.message_content.lower())
 
