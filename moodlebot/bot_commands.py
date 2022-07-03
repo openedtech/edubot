@@ -35,13 +35,17 @@ class Command:
         self.client = client
         self.store = store
         self.config = config
-        self.command = command_and_args.split()[0]
+        self.command_and_args = command_and_args.split()
+        self.command = command_and_args[0]
         self.room = room
         self.event = event
-        self.args = command_and_args.split()[1:]
+        self.args = []
 
     async def process(self):
         """Process the command"""
+        if len(self.command_and_args.split()) > 0:
+            self.args = self.command_and_args[1:]
+
         if self.event.sender not in g.config.admins:
             return
 
