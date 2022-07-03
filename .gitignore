@@ -21,8 +21,6 @@ __pycache__/
 build/
 dist/
 
-# Config file
-config.yaml
 
 # Log files
 *.log
