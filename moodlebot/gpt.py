@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import openai
 from nio import RoomMessagesResponse, BadEvent, UnknownBadEvent, RoomMessage, RoomMessageText
+from openai import InvalidRequestError
 
 from moodlebot import g
-
 
 
 def process_events(messages: RoomMessagesResponse) -> str:

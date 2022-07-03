@@ -60,7 +60,7 @@ class Message:
     async def _respond(self):
         limit = 20
         if "moodlebot" != self.message_content.lower() or self.room.member_count <= 2:
-            limit = 200
+            limit = 60
 
         messages = await self.client.room_messages(self.room.room_id, self.client.loaded_sync_token, limit=limit)
         if isinstance(messages, RoomMessagesError):

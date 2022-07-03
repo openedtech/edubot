@@ -58,7 +58,7 @@ class Callbacks:
         )
 
         # Process as message if in a public room without command prefix
-        has_command_prefix = msg.startswith(self.command_prefix)
+        has_command_prefix = msg.startswith(self.command_prefix.lstrip())
 
         if not has_command_prefix:
             # General message listener
