@@ -16,9 +16,10 @@ from nio import (
     UnknownEvent,
 )
 
-from my_project_name.callbacks import Callbacks
-from my_project_name.config import Config
-from my_project_name.storage import Storage
+from moodlebot import g
+from moodlebot.callbacks import Callbacks
+from moodlebot.config import Config
+from moodlebot.storage import Storage
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,7 @@ async def main():
 
     # Read the parsed config file and create a Config object
     config = Config(config_path)
+    g.config = config
 
     # Configure the database
     store = Storage(config.database)

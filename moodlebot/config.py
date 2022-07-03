@@ -4,9 +4,10 @@ import re
 import sys
 from typing import Any, List, Optional
 
+import openai
 import yaml
 
-from my_project_name.errors import ConfigError
+from moodlebot.errors import ConfigError
 
 logger = logging.getLogger()
 logging.getLogger("peewee").setLevel(
@@ -28,6 +29,27 @@ class Config:
 
         # Parse and validate config options
         self._parse_config_values()
+        self._get_from_env()
+
+    def _get_from_env(self):
+        env_vars = {}
+        with open(".env") as f:
+            for line in f:
+                key, value = line.strip().split("=", 1)
+                env_vars[key] = value
+
+        self.openai_key = env_vars["OPENAI_KEY"]
+        self.user_password = env_vars["MATRIX_PW"]
+
+        if not self.user_token and not self.user_password:
+            raise ConfigError("Must supply either user token or password")
+
+        self.greeting = "Hi, my name is MoodleBot!"
+        try:
+            with open("GREETING", "r") as f:
+                self.greeting = f.read()
+        except FileNotFoundError:
+            pass
 
     def _parse_config_values(self):
         """Read and validate each config option"""
@@ -94,8 +116,6 @@ class Config:
 
         self.user_password = self._get_cfg(["matrix", "user_password"], required=False)
         self.user_token = self._get_cfg(["matrix", "user_token"], required=False)
-        if not self.user_token and not self.user_password:
-            raise ConfigError("Must supply either user token or password")
 
         self.device_id = self._get_cfg(["matrix", "device_id"], required=True)
         self.device_name = self._get_cfg(
@@ -104,6 +124,10 @@ class Config:
         self.homeserver_url = self._get_cfg(["matrix", "homeserver_url"], required=True)
 
         self.command_prefix = self._get_cfg(["command_prefix"], default="!c") + " "
+
+        self.original_prompt = self._get_cfg(["original_prompt"], required=True)
+        self.admin_help = self._get_cfg(["admin_help"], required=True)
+        self.admins = self._get_cfg(["admins"], required=True)
 
     def _get_cfg(
         self,

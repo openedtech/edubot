@@ -20,12 +20,12 @@ def read_file(path_segments):
         return f.read()
 
 
-version = exec_file(("my_project_name", "__init__.py"))["__version__"]
+version = exec_file(("moodlebot", "__init__.py"))["__version__"]
 long_description = read_file(("README.md",))
 
 
 setup(
-    name="my-project-name",
+    name="moodlebot_init",
     version=version,
     url="https://github.com/anoadragon453/nio-template",
     description="A matrix bot to do amazing things!",
@@ -54,6 +54,6 @@ setup(
     ],
     long_description=long_description,
     long_description_content_type="text/markdown",
-    # Allow the user to run the bot with `my-project-name ...`
-    scripts=["my-project-name"],
+    # Allow the user to run the bot with `moodlebot_init ...`
+    scripts=["moodlebot_init"],
 )

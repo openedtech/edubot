@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from nio import (
@@ -11,11 +12,12 @@ from nio import (
     UnknownEvent,
 )
 
-from my_project_name.bot_commands import Command
-from my_project_name.chat_functions import make_pill, react_to_event, send_text_to_room
-from my_project_name.config import Config
-from my_project_name.message_responses import Message
-from my_project_name.storage import Storage
+from moodlebot import g
+from moodlebot.bot_commands import Command
+from moodlebot.chat_functions import make_pill, react_to_event, send_text_to_room
+from moodlebot.config import Config
+from moodlebot.message_responses import Message
+from moodlebot.storage import Storage
 
 logger = logging.getLogger(__name__)
 
@@ -58,24 +60,23 @@ class Callbacks:
         # Process as message if in a public room without command prefix
         has_command_prefix = msg.startswith(self.command_prefix)
 
-        # room.is_group is often a DM, but not always.
-        # room.is_group does not allow room aliases
-        # room.member_count > 2 ... we assume a public room
-        # room.member_count <= 2 ... we assume a DM
-        if not has_command_prefix and room.member_count > 2:
+        if not has_command_prefix:
             # General message listener
             message = Message(self.client, self.store, self.config, msg, room, event)
             await message.process()
             return
 
-        # Otherwise if this is in a 1-1 with the bot or features a command prefix,
-        # treat it as a command
+        # Admin commands
         if has_command_prefix:
             # Remove the command prefix
-            msg = msg[len(self.command_prefix) :]
+            msg = msg[len(self.command_prefix):]
 
         command = Command(self.client, self.store, self.config, msg, room, event)
         await command.process()
+
+    async def _join_message(self, room_id):
+        await asyncio.sleep(5)
+        await send_text_to_room(self.client, room_id, g.config.greeting)
 
     async def invite(self, room: MatrixRoom, event: InviteMemberEvent) -> None:
         """Callback for when an invite is received. Join the room specified in the invite.
@@ -101,11 +102,12 @@ class Callbacks:
         else:
             logger.error("Unable to join room: %s", room.room_id)
 
+        asyncio.ensure_future(self._join_message(room.room_id))
         # Successfully joined room
         logger.info(f"Joined {room.room_id}")
 
     async def invite_event_filtered_callback(
-        self, room: MatrixRoom, event: InviteMemberEvent
+          self, room: MatrixRoom, event: InviteMemberEvent
     ) -> None:
         """
         Since the InviteMemberEvent is fired for every m.room.member state received
@@ -118,7 +120,7 @@ class Callbacks:
             await self.invite(room, event)
 
     async def _reaction(
-        self, room: MatrixRoom, event: UnknownEvent, reacted_to_id: str
+          self, room: MatrixRoom, event: UnknownEvent, reacted_to_id: str
     ) -> None:
         """A reaction was sent to one of our messages. Let's send a reply acknowledging it.
 
