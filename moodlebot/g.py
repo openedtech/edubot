@@ -1,3 +1,5 @@
+from typing import Union
+
 from moodlebot.config import Config
 
-config: Config = None
+config: Union[Config, None] = None

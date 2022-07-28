@@ -16,12 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 async def send_text_to_room(
-    client: AsyncClient,
-    room_id: str,
-    message: str,
-    notice: bool = True,
-    markdown_convert: bool = True,
-    reply_to_event_id: Optional[str] = None,
+      client: AsyncClient,
+      room_id: str,
+      message: str,
+      notice: bool = True,
+      markdown_convert: bool = True,
+      reply_to_event_id: Optional[str] = None,
 ) -> Union[RoomSendResponse, ErrorResponse]:
     """Send text to a matrix room.
 
@@ -91,10 +91,10 @@ def make_pill(user_id: str, displayname: str = None) -> str:
 
 
 async def react_to_event(
-    client: AsyncClient,
-    room_id: str,
-    event_id: str,
-    reaction_text: str,
+      client: AsyncClient,
+      room_id: str,
+      event_id: str,
+      reaction_text: str,
 ) -> Union[Response, ErrorResponse]:
     """Reacts to a given event in a room with the given reaction text
 
