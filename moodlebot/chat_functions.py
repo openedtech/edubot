@@ -46,14 +46,14 @@ async def send_text_to_room(
     """
     # Determine whether to ping room members or not
     msgtype = "m.notice" if notice else "m.text"
-
+    
     content = {
         "msgtype": msgtype,
-        "format": "org.matrix.custom.html",
         "body": message,
     }
 
     if markdown_convert:
+        content["format"] = "org.matrix.custom.html"
         content["formatted_body"] = markdown(message)
 
     if reply_to_event_id:
