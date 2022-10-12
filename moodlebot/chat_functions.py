@@ -19,7 +19,7 @@ async def send_text_to_room(
       client: AsyncClient,
       room_id: str,
       message: str,
-      notice: bool = Falsefix,
+      notice: bool = False,
       markdown_convert: bool = True,
       reply_to_event_id: Optional[str] = None,
 ) -> Union[RoomSendResponse, ErrorResponse]:
