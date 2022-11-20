@@ -3,10 +3,10 @@ from __future__ import annotations
 from datetime import datetime
 
 import openai
-from sql import Message, Session, Thread
 from sqlalchemy import select
 
 from edubot import config
+from edubot.sql import Message, Session, Thread
 
 
 class EduBot:
