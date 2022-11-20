@@ -3,10 +3,10 @@ from __future__ import annotations
 from datetime import datetime
 
 import openai
+from sql import Message, Session, Thread
 from sqlalchemy import select
 
 from edubot import config
-from sql import Session, Thread, Message
 
 
 class EduBot:
@@ -23,7 +23,9 @@ class EduBot:
         self.platform = platform
         self.personality = personality
 
-    def gpt_answer(self, context: list[dict[str, str | datetime]], thread_id: int) -> str:
+    def gpt_answer(
+        self, context: list[dict[str, str | datetime]], thread_id: int
+    ) -> str:
         """
         Use chat context generate a GPT3 response.
 
@@ -47,13 +49,15 @@ class EduBot:
                 session.add(thread)
 
             for msg in context:
-                msg_exists = bool(session.scalars(
-                    select(Message)
-                    .where(Message.username == msg["username"])
-                    .where(Message.message == msg["message"])
-                    .where(Message.time == msg["time"])
-                    .first()
-                ))
+                msg_exists = bool(
+                    session.scalars(
+                        select(Message)
+                        .where(Message.username == msg["username"])
+                        .where(Message.message == msg["message"])
+                        .where(Message.time == msg["time"])
+                        .first()
+                    )
+                )
 
                 if msg_exists:
                     continue
