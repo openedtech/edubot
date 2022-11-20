@@ -1,6 +1,13 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, UniqueConstraint
+from sqlalchemy import (
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+    create_engine,
+)
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
-from sqlalchemy import create_engine
 
 engine = create_engine("sqlite://", echo=True, future=True)
 
@@ -13,7 +20,9 @@ class Thread(Base):
     __table_name__ = "thread"
 
     id = Column(Integer, primary_key=True)
-    thread_id = Column(Integer,)
+    thread_id = Column(
+        Integer,
+    )
     platform = Column(String(100))
     messages = relationship("Message", cascade="all, delete")
 

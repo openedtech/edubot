@@ -1,2 +1,3 @@
 sqlalchemy~=1.4.44
-openai==0.25.0
+openai~=0.25.0
+pre-commit~=2.20.0
