@@ -12,7 +12,7 @@ from edubot.sql import Message, Session, Thread
 class EduBot:
     def __init__(self, bot_name: str, platform: str, personality: str = ""):
         """
-        Initalise EduBot with personalised information about the bot
+        Initialise EduBot with personalised information about the bot.
 
         :param bot_name: A unique name to identify this bot from others
         :param platform: The platform the bot is running on E.g. 'telegram' 'matrix' 'mastodon'

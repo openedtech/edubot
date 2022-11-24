@@ -1,16 +1,22 @@
 repos:
+  - repo: "local"
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: bash -c 'poetry run mypy "$@" || true'
+        language: system
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.4.0
     hooks:
       - id: check-yaml
+      - id: check-toml
       - id: trailing-whitespace
       - id: check-added-large-files
       - id: check-symlinks
       - id: check-docstring-first
       - id: end-of-file-fixer
       - id: debug-statements
-      - id: check-toml
-      - id: check-yaml
       - id: mixed-line-ending
   - repo: https://github.com/psf/black
     rev: 22.10.0
@@ -21,9 +27,3 @@ repos:
     hooks:
       - id: isort
         args: ["--profile", "black"]
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v0.991
-    hooks:
-      - id: mypy
-        verbose: true
-        entry: bash -c 'mypy "$@" || true' --
