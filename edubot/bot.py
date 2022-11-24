@@ -37,12 +37,11 @@ class EduBot:
         openai.api_key = OPENAI_KEY
 
         with Session() as session:
-            thread = session.scalars(
+            thread = session.execute(
                 select(Thread)
                 .where(Thread.thread_id == thread_id)
                 .where(Thread.platform == self.platform)
-                .first()
-            )
+            ).fetchone()
             if not thread:
                 thread = Thread(thread_id=thread_id, platform=self.platform)
 
@@ -50,13 +49,12 @@ class EduBot:
 
             for msg in context:
                 msg_exists = bool(
-                    session.scalars(
+                    session.execute(
                         select(Message)
                         .where(Message.username == msg["username"])
                         .where(Message.message == msg["message"])
                         .where(Message.time == msg["time"])
-                        .first()
-                    )
+                    ).fetchone()
                 )
 
                 if msg_exists:
@@ -65,7 +63,7 @@ class EduBot:
                 if msg["username"] == self.bot_name:
                     msg["by_bot"] = self.bot_name
 
-                Message(**msg)
+                session.add(Message(**msg))
 
             session.commit()
 

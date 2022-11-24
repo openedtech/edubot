@@ -1,3 +1,4 @@
+import sqlalchemy
 from sqlalchemy import (
     Column,
     DateTime,
@@ -7,11 +8,12 @@ from sqlalchemy import (
     UniqueConstraint,
     create_engine,
 )
-from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+from sqlalchemy.orm import declarative_base, registry, relationship, sessionmaker
 
 from edubot import DATABASE
 
 engine = create_engine(DATABASE, echo=True, future=True)
+
 
 Base = declarative_base()
 
@@ -19,7 +21,7 @@ Session = sessionmaker(engine)
 
 
 class Thread(Base):
-    __table_name__ = "thread"
+    __tablename__ = "thread"
 
     id = Column(Integer, primary_key=True)
     thread_id = Column(
@@ -28,11 +30,11 @@ class Thread(Base):
     platform = Column(String(100))
     messages = relationship("Message", cascade="all, delete")
 
-    UniqueConstraint(columns=[thread_id, platform])
+    UniqueConstraint(thread_id, platform)
 
 
 class Message(Base):
-    __table_name__ = "message"
+    __tablename__ = "message"
 
     id = Column(Integer, primary_key=True)
     username = Column(String(100), nullable=False)
@@ -43,3 +45,7 @@ class Message(Base):
     by_bot = String(100)
 
     thread_id = Column(Integer, ForeignKey("thread.id"))
+
+
+# Create Tables if they aren't already
+Base.metadata.create_all(engine)

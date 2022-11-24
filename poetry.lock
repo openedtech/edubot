@@ -411,7 +411,7 @@ testing = ["coverage (>=6.2)", "coverage-enable-subprocess (>=1)", "flaky (>=3.7
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "2592d847408bb28a0924fd1fad34c459287337bc6329c6666f7b4dbdb4a67716"
+content-hash = "d1c6f5bd29810bbbcbc3db03bf01a01ebeab50a0838641559cd91fad024b2a57"
 
 [metadata.files]
 certifi = [
