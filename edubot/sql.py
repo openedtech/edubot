@@ -9,7 +9,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
-engine = create_engine("sqlite://", echo=True, future=True)
+from edubot import DATABASE
+
+engine = create_engine(DATABASE, echo=True, future=True)
 
 Base = declarative_base()
 
