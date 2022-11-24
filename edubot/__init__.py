@@ -11,7 +11,8 @@ def _read_cfg() -> ConfigParser:
     try:
         config_fp = environ["EDUBOT_CONFIG"]
     except KeyError:
-        print("EDUBOT_CONFIG environment variable not set.")
+        print("EDUBOT_CONFIG environment variable not set.", stderr)
+        exit(1)
 
     config = ConfigParser()
 
