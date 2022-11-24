@@ -5,7 +5,7 @@ from datetime import datetime
 import openai
 from sqlalchemy import select
 
-from edubot import config
+from edubot import OPENAI_KEY
 from edubot.sql import Message, Session, Thread
 
 
@@ -27,14 +27,14 @@ class EduBot:
         self, context: list[dict[str, str | datetime]], thread_id: int
     ) -> str:
         """
-        Use chat context generate a GPT3 response.
+        Use chat context to generate a GPT3 response.
 
-        :param context: Chat context as list of dicts with attrs: 'username' (str), 'message' (str), and 'time' (datetime)
-        :param thread_id: The ID of the thread this context pertains to.
+        :param context: Chat context as list of dicts with attrs: 'username', 'message', and 'time' (as datetime)
+        :param thread_id: The ID of the thread this context pertains to
 
         :returns: The response from GPT
         """
-        openai.api_key = config.API_KEY
+        openai.api_key = OPENAI_KEY
 
         with Session() as session:
             thread = session.scalars(

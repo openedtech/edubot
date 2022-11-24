@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "edubot"
-version = "0.1.0"
+version = "0.2.0"
 description = ""
 authors = ["exciteabletom <tom@digitalnook.net>", "moodler <martin@moodle.com>"]
 license = "GPLv3"
@@ -13,7 +13,7 @@ openai = ">=0.25.0,<0.26.0"
 
 [tool.poetry.dev-dependencies]
 pre-commit = ">=2.20.0,<2.21.0"
-mypy = "^0.991"
+mypy = "^0.990"
 
 [tool.mypy]
 plugins = "sqlalchemy.ext.mypy.plugin"
