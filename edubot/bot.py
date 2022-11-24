@@ -24,7 +24,7 @@ class EduBot:
         self.personality = personality
 
     def gpt_answer(
-        self, context: list[dict[str, str | datetime]], thread_id: int
+        self, context: list[dict[str, str | datetime]], thread_id: str
     ) -> str:
         """
         Use chat context to generate a GPT3 response.

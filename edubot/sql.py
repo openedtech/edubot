@@ -25,7 +25,7 @@ class Thread(Base):
 
     id = Column(Integer, primary_key=True)
     thread_id = Column(
-        Integer,
+        String,
     )
     platform = Column(String(100))
     messages = relationship("Message", cascade="all, delete")
@@ -44,7 +44,7 @@ class Message(Base):
     # The bot name that wrote this message if it did
     by_bot = String(100)
 
-    thread_id = Column(Integer, ForeignKey("thread.id"))
+    thread_id = Column(String, ForeignKey("thread.id"))
 
 
 # Create Tables if they aren't already
