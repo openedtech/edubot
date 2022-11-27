@@ -27,7 +27,7 @@ class Thread(Base):
     thread_id = Column(
         String,
     )
-    platform = Column(String(100))
+    platform = Column(String(100), nullalble=False)
     messages = relationship("Message", cascade="all, delete")
 
     UniqueConstraint(thread_id, platform)
