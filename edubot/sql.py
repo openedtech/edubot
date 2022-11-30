@@ -1,4 +1,3 @@
-import sqlalchemy
 from sqlalchemy import (
     Column,
     DateTime,
@@ -8,7 +7,7 @@ from sqlalchemy import (
     UniqueConstraint,
     create_engine,
 )
-from sqlalchemy.orm import declarative_base, registry, relationship, sessionmaker
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 from edubot import DATABASE
 
