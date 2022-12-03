@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 import openai
 from sqlalchemy import select
 
 from edubot import OPENAI_KEY
-from edubot.sql import Message, Session, Thread
+from edubot.sql import Bot, Message, Session, Thread
+from edubot.types import MessageInfo
 
 
 class EduBot:
@@ -23,13 +22,30 @@ class EduBot:
         self.platform = platform
         self.personality = personality
 
-    def gpt_answer(
-        self, context: list[dict[str, str | datetime]], thread_id: str
-    ) -> str:
+        self.__add_bot_to_db()
+
+    def __add_bot_to_db(self):
+        """
+        Insert this bot into the DB if it isn't already.
+        """
+        with Session() as session:
+            bot = session.execute(
+                select(Bot)
+                .where(Bot.name == self.bot_name)
+                .where(Bot.platform == self.platform)
+            ).fetchone()
+
+            if not bot:
+                new_bot = Bot(name=self.bot_name, platform=self.platform)
+
+                session.add(new_bot)
+                session.commit()
+
+    def gpt_answer(self, context: list[MessageInfo], thread_id: str) -> str:
         """
         Use chat context to generate a GPT3 response.
 
-        :param context: Chat context as list of dicts with attrs: 'username', 'message', and 'time' (as datetime)
+        :param context: Chat context as a chronological list of MessageInfo
         :param thread_id: The ID of the thread this context pertains to
 
         :returns: The response from GPT
@@ -59,9 +75,6 @@ class EduBot:
 
                 if msg_exists:
                     continue
-
-                if msg["username"] == self.bot_name:
-                    msg["by_bot"] = self.bot_name
 
                 session.add(Message(**msg))
 

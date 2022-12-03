@@ -13,7 +13,6 @@ from edubot import DATABASE
 
 engine = create_engine(DATABASE, echo=True, future=True)
 
-
 Base = declarative_base()
 
 Session = sessionmaker(engine)
@@ -23,9 +22,7 @@ class Thread(Base):
     __tablename__ = "thread"
 
     id = Column(Integer, primary_key=True)
-    thread_id = Column(
-        String,
-    )
+    thread_id = Column(String, nullable=False)
     platform = Column(String(100), nullable=False)
     messages = relationship("Message", cascade="all, delete")
 
@@ -43,7 +40,28 @@ class Message(Base):
     # The bot name that wrote this message if it did
     by_bot = String(100)
 
-    thread_id = Column(String, ForeignKey("thread.id"))
+    thread = Column(String, ForeignKey("thread.id"), nullable=False)
+
+
+class Completion(Base):
+    __tablename__ = "completion"
+
+    id = Column(Integer, primary_key=True)
+    bot = Column(Integer, ForeignKey("bot.id"), nullable=False)
+    message = Column(String(5000), nullable=False)
+    reply_to = Column(Integer, ForeignKey("message.id"), nullable=False)
+
+
+class Bot(Base):
+    __tablename__ = "bot"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False)
+    platform = Column(String(100), nullable=False)
+
+    completions = relationship("Completion", cascade="all, delete")
+
+    UniqueConstraint(name, platform)
 
 
 # Create Tables if they aren't already
