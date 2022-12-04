@@ -2,21 +2,21 @@
 Read the config into the global scope when the library is imported.
 """
 from configparser import ConfigParser
-from os import environ
-from sys import stderr
+from os import environ, path
 
 
 def _read_cfg() -> ConfigParser:
-    config_fp = ""
     try:
         config_fp = environ["EDUBOT_CONFIG"]
     except KeyError:
-        print("EDUBOT_CONFIG environment variable not set.", file=stderr)
-        exit(1)
+        raise EnvironmentError("EDUBOT_CONFIG environment variable not set.")
 
     config = ConfigParser()
 
-    config.read(config_fp)
+    if not config.read(config_fp):
+        if path.exists(config_fp):
+            raise PermissionError(f"Cannot read {config_fp}.")
+        raise FileNotFoundError(f"File {config_fp} doesn't exist.")
     return config
 
 
