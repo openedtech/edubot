@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 import openai
 from sqlalchemy import select
 
 from edubot import OPENAI_KEY
-from edubot.sql import Bot, Message, Session, Thread
+from edubot.sql import Bot, Completion, Message, Session, Thread
 from edubot.types import MessageInfo
 
 
@@ -13,7 +15,7 @@ class EduBot:
         """
         Initialise EduBot with personalised information about the bot.
 
-        :param bot_name: A unique name to identify this bot from others
+        :param bot_name: A unique name to identify this bot from others.
         :param platform: The platform the bot is running on E.g. 'telegram' 'matrix' 'mastodon'
         :param personality: Some example conversation to influence the bots personality and mission.
             Must be in "username: message\n ..." format.
@@ -23,23 +25,58 @@ class EduBot:
         self.personality = personality
 
         self.__add_bot_to_db()
+        self.bot_id = self.__get_bot_id()
 
-    def __add_bot_to_db(self):
+        openai.api_key = OPENAI_KEY
+
+    def __add_bot_to_db(self) -> None:
         """
         Insert this bot into the DB if it isn't already.
         """
-        with Session() as session:
-            bot = session.execute(
-                select(Bot)
-                .where(Bot.name == self.bot_name)
-                .where(Bot.platform == self.platform)
-            ).fetchone()
-
-            if not bot:
+        if not self.__check_if_bot(self.bot_name):
+            with Session() as session:
                 new_bot = Bot(name=self.bot_name, platform=self.platform)
 
                 session.add(new_bot)
                 session.commit()
+
+    def __get_bot(self, username: str) -> bool:
+        """
+        Get a bot by username.
+        """
+        with Session() as session:
+            bot = session.execute(
+                select(Bot)
+                .where(Bot.name == username)
+                .where(Bot.platform == self.platform)
+            ).fetchone()
+
+            return bool(bot)
+
+    def __get_bot_id(self):
+        pass
+
+    def __get_message(self, username: str, time: datetime) -> Message:
+        """
+        Get an ORM Message object from the database.
+        """
+        with Session() as session:
+            message = session.execute(
+                select(Message).where(username == username).where(time == time)
+            ).fetchone()
+
+            return message
+
+    def __add_completion(self, completion: str, reply_to: MessageInfo) -> None:
+        """
+        Add a completion to the database.
+
+        :param completion: The text the bot generated.
+        :param reply_to: The message the bot was replying to.
+        """
+        msg_id = self.__get_message(reply_to["username"], reply_to["time"]).id
+        with Session() as session:
+            new_comp = Completion(bot)
 
     def gpt_answer(self, context: list[MessageInfo], thread_id: str) -> str:
         """
@@ -50,8 +87,6 @@ class EduBot:
 
         :returns: The response from GPT
         """
-        openai.api_key = OPENAI_KEY
-
         with Session() as session:
             thread = session.execute(
                 select(Thread)
@@ -73,15 +108,17 @@ class EduBot:
                     ).fetchone()
                 )
 
-                if msg_exists:
+                # If the message exists, or the message was written by an instance of edubot
+                # TODO:
+                if msg_exists or self.__get_bot(msg["username"]):
                     continue
 
-                session.add(Message(**msg))
+                session.add(Message(**msg, thread_id=thread_id))
 
             session.commit()
 
+        # Construct context for OpenAI completion
         context_str = ""
-
         for msg in context:
             context_str += f"{msg['username']}: {msg['message']}\n"
 
@@ -96,6 +133,9 @@ class EduBot:
         )
 
         text_response: str = response["choices"][0]["text"]
+
+        self.__add_completion(text_response, context[-1])
+
         text_response = text_response.replace(f"{self.bot_name}: ", "").lstrip()
 
         return text_response

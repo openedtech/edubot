@@ -3,6 +3,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    PrimaryKeyConstraint,
     String,
     UniqueConstraint,
     create_engine,
@@ -55,12 +56,12 @@ class Completion(Base):
 class Bot(Base):
     __tablename__ = "bot"
 
-    id = Column(Integer, primary_key=True)
-    name = Column(String(100), nullable=False)
-    platform = Column(String(100), nullable=False)
+    name = Column(String(100), primary_key=True)
+    platform = Column(String(100), primary_key=True)
 
     completions = relationship("Completion", cascade="all, delete")
 
+    PrimaryKeyConstraint()
     UniqueConstraint(name, platform)
 
 
