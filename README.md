@@ -1,5 +1,14 @@
 # Edubot
 
+An AI-based bot (currently using GPT-3) designed to be used in various environment (Matrix, Mastodon, etc).
+
+The Edubot, as the name suggests, focussed on use in educational environments:
+  1. It is intended to be educational, with a customisable personality for your context.
+  1. It can learn from interaction with users.
+  
+Edubot is the first project from Open EdTech  https://openedtech.global 
+
+
 ## Dev environment quickstart
 1. Install [Poetry](https://python-poetry.org/docs/)
 1. Install dependencies: `poetry install`
