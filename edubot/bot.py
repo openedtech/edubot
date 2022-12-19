@@ -10,6 +10,10 @@ from edubot.types import MessageInfo
 
 
 class EduBot:
+    """
+    An AI chatbot which continually improves itself using user feedback.
+    """
+
     def __init__(self, username: str, platform: str, personality: str = ""):
         """
         Initialise EduBot with personalised information about the bot.
@@ -26,7 +30,7 @@ class EduBot:
         self.__add_bot_to_db()
 
         # The primary key of the bot in the database
-        self.bot_pk = self.__get_bot(username).id
+        self.__bot_pk = self.__get_bot(username).id
 
         openai.api_key = OPENAI_KEY
 
@@ -100,7 +104,7 @@ class EduBot:
         msg_id = self.__get_message(reply_to).id
         with Session() as session:
             new_comp = Completion(
-                bot=self.bot_pk,
+                bot=self.__bot_pk,
                 message=completion,
                 reply_to=msg_id,
             )
@@ -147,7 +151,7 @@ class EduBot:
             context_str += f"{msg['username']}: {msg['message']}\n"
 
         response = openai.Completion.create(
-            engine="text-davinci-002",
+            engine="text-davinci-003",
             prompt=self.personality + context_str + f"{self.username}: ",
             temperature=0.9,
             max_tokens=750,
