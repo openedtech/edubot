@@ -160,11 +160,14 @@ class EduBot:
         if personality_override:
             personality = personality_override
 
+        if not personality.endswith("\n"):
+            personality += "\n"
+
         response = openai.Completion.create(
             engine="text-davinci-003",
             prompt=personality + context_str + f"{self.username}: ",
             temperature=0.9,
-            max_tokens=750,
+            max_tokens=900,
             top_p=1,
             frequency_penalty=1.0,
             presence_penalty=0.6,
