@@ -1,12 +1,59 @@
 """
 Module for AI processing tasks
 """
+import logging
+
 import openai
+from openai import OpenAIError
 from sqlalchemy import select
 
 from edubot import OPENAI_KEY
 from edubot.sql import Bot, Completion, Message, Session, Thread
 from edubot.types import MessageInfo
+
+# The maximum number of GPT tokens that chat context can be.
+# The limit for text-davinci-003 is 4097.
+# We limit to 2800 to allow extra room for the response and the personality.
+MAX_GPT_TOKENS = 2800
+
+logger = logging.getLogger(__name__)
+
+
+def estimate_tokens(text: str) -> int:
+    """
+    Roughly estimates how many GPT tokens a string is.
+    See: https://help.openai.com/en/articles/4936856-what-are-tokens-and-how-to-count-them
+
+    :return: The estimated amount of tokens.
+    """
+    # Get two estimates
+    est1 = len(text) / 4
+    est2 = len(text.split(" ")) * 0.75
+
+    # Average them
+    return round((est1 + est2) / 2)
+
+
+def format_context(context: list[MessageInfo]) -> str:
+    """
+    Formats chat context to a string representation.
+    Note, this will truncate context if it exceeds GPT token limits.
+
+    :param context: A list of MessageInfo.
+    :return: The context as a string.
+    """
+    while True:
+        context_str = ""
+        # Convert the list into a string.
+        for msg in context:
+            context_str += f"{msg['username']}: {msg['message']}\n"
+
+        # If the string doesn't exceed GPT limits
+        if estimate_tokens(context_str) < MAX_GPT_TOKENS:
+            return context_str
+
+        # The string does exceed the limits, so we remove the first item to make it shorter
+        context = context[1:]
 
 
 class EduBot:
@@ -152,9 +199,7 @@ class EduBot:
             session.commit()
 
         # Construct context for OpenAI completion
-        context_str = ""
-        for msg in context:
-            context_str += f"{msg['username']}: {msg['message']}\n"
+        context_str = format_context(context)
 
         personality = self.personality
         if personality_override:
@@ -163,15 +208,19 @@ class EduBot:
         if not personality.endswith("\n"):
             personality += "\n"
 
-        response = openai.Completion.create(
-            engine="text-davinci-003",
-            prompt=personality + context_str + f"{self.username}: ",
-            temperature=0.9,
-            max_tokens=900,
-            top_p=1,
-            frequency_penalty=1.0,
-            presence_penalty=0.6,
-        )
+        try:
+            response = openai.Completion.create(
+                engine="text-davinci-003",
+                prompt=personality + context_str + f"{self.username}: ",
+                temperature=0.9,
+                max_tokens=500,
+                top_p=1,
+                frequency_penalty=1.0,
+                presence_penalty=0.6,
+            )
+        except OpenAIError as e:
+            logger.error(f"OpenAI request failed: {e}")
+            return ""
 
         completion: str = response["choices"][0]["text"]
 
