@@ -111,12 +111,18 @@ class EduBot:
             session.add(new_comp)
             session.commit()
 
-    def gpt_answer(self, context: list[MessageInfo], thread_name: str) -> str:
+    def gpt_answer(
+        self,
+        context: list[MessageInfo],
+        thread_name: str,
+        personality_override: str = None,
+    ) -> str:
         """
         Use chat context to generate a GPT3 response.
 
         :param context: Chat context as a chronological list of MessageInfo
         :param thread_name: The unique identifier of the thread this context pertains to
+        :param personality_override: A custom personality that overrides the default.
 
         :returns: The response from GPT
         """
@@ -150,9 +156,13 @@ class EduBot:
         for msg in context:
             context_str += f"{msg['username']}: {msg['message']}\n"
 
+        personality = self.personality
+        if personality_override:
+            personality = personality_override
+
         response = openai.Completion.create(
             engine="text-davinci-003",
-            prompt=self.personality + context_str + f"{self.username}: ",
+            prompt=personality + context_str + f"{self.username}: ",
             temperature=0.9,
             max_tokens=750,
             top_p=1,
