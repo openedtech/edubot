@@ -1,15 +1,17 @@
 """
 Module for AI processing tasks
 """
+import datetime
 import logging
 
 import openai
 from openai import OpenAIError
-from sqlalchemy import select
+from sqlalchemy import desc, select
+from sqlalchemy.engine import Result
 
 from edubot import OPENAI_KEY
 from edubot.sql import Bot, Completion, Message, Session, Thread
-from edubot.types import MessageInfo
+from edubot.types import CompletionInfo, MessageInfo
 
 # The maximum number of GPT tokens that chat context can be.
 # The limit for text-davinci-003 is 4097.
@@ -232,3 +234,56 @@ class EduBot:
 
         # Return the completion result back to the integration
         return completion
+
+    def change_completion_score(
+        self, offset: int, completion: CompletionInfo, thread_name: str
+    ) -> None:
+        """
+        Change user feedback to a completion.
+
+        :param offset: An integer representing the new positive or negative votes to this reaction.
+        :param completion: Information about the completion being reacted to.
+        :param thread_name: A unique identifier for the thread the completion resides in.
+        """
+
+        # 1.5 mins before the completion was sent
+        delta = completion["time"] - datetime.timedelta(minutes=1, seconds=30)
+
+        with Session() as session:
+
+            # This select statement might get the wrong completion if the bot has sent duplicate messages in the same
+            #  thread within 1.5 minutes.
+            # BUT this isn't really a problem because it's very likely that users have the same reaction to
+            #  both of the duplicate messages.
+            # TODO: Is there a way to uniquely identify a bot completion? We can't record the time the completion was
+            #  sent as we don't know when the integration sends the completion. The integration also can't know for
+            #  sure which message a completion was replying to, as messages can be sent while the bot is generating
+            #  responses.
+            completion_row = session.execute(
+                select(Completion)
+                .join(Bot)
+                .join(Message)
+                .join(Thread)
+                .where(Completion.message == completion["message"])
+                .where(Thread.thread_name == thread_name)
+                .where(Bot.id == self.__bot_pk)
+                # The message being replied to was sent not more than 1.5 minutes before the completion
+                .where(delta < Message.time)
+                .where(Message.time < completion["time"])
+                .order_by(desc(Completion.id))
+            ).fetchone()
+
+            if not completion_row:
+                logger.debug(
+                    f"Message is not a GPT completion: '{completion['message']}' @ {completion['time']}"
+                )
+                return
+
+            completion: Completion = completion_row[0]
+
+            completion.score += offset
+
+            session.add(completion)
+            session.commit()
+
+            logger.info(f"Completion {completion.id} incremented by {offset}.")

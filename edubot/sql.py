@@ -78,6 +78,9 @@ class Completion(Base):
     # The bot that wrote this completion
     bot = Column(Integer, ForeignKey("bot.id"), nullable=False)
 
+    # The score of user feedback to this completion
+    score = Column(Integer, default=0, nullable=False)
+
     message = Column(String(5000), nullable=False)
 
     # The message the bot was replying to
