@@ -2,9 +2,9 @@
 
 A self-improving AI-based chatbot library that is completely platform-agnostic.
 
-Edubot intuitively jumps into conversations to give advice, make jokes, and add to the discussion. It's personality can be completely customised to suit the tone of different rooms.
+Edubot intuitively jumps into conversations to give advice, make jokes, and add to the discussion. Its personality can be completely customised to suit the tone of different rooms.
 
-By simply reacting to messages with a thumbs up/down, users help Edubot collate feedback. This feedback is used to fine-tune the bot and improve it's responses in the future.
+By simply reacting to messages with a thumbs up/down, users help Edubot collate feedback. This feedback is used to fine-tune the bot and improve its responses in the future.
 
 Edubot is still under active development and is the first project from [Open EdTech](https://openedtech.global).
 
