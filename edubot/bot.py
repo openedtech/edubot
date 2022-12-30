@@ -7,7 +7,6 @@ import logging
 import openai
 from openai import OpenAIError
 from sqlalchemy import desc, select
-from sqlalchemy.engine import Result
 
 from edubot import OPENAI_KEY
 from edubot.sql import Bot, Completion, Message, Session, Thread
