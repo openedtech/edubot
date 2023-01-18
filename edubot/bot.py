@@ -4,6 +4,7 @@ Module for AI processing tasks
 import datetime
 import io
 import logging
+from typing import Union
 
 import openai
 from grpc._channel import _MultiThreadedRendezvous
@@ -299,7 +300,7 @@ class EduBot:
 
             logger.info(f"Completion {completion.id} incremented by {offset}.")
 
-    def generate_image(self, prompt: str) -> Image | None:
+    def generate_image(self, prompt: str) -> Union[Image, None]:
         """
         Generate an image using Stability AI's DreamStudio.
 
