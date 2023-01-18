@@ -2,13 +2,17 @@
 Module for AI processing tasks
 """
 import datetime
+import io
 import logging
 
 import openai
 from openai import OpenAIError
+from PIL import Image
 from sqlalchemy import desc, select
+from stability_sdk.client import StabilityInference, process_artifacts_from_answers
+from stability_sdk.utils import generation
 
-from edubot import OPENAI_KEY
+from edubot import DREAMSTUDIO_KEY, OPENAI_KEY
 from edubot.sql import Bot, Completion, Message, Session, Thread
 from edubot.types import CompletionInfo, MessageInfo
 
@@ -81,6 +85,9 @@ class EduBot:
         self.__bot_pk = self.__get_bot(username).id
 
         openai.api_key = OPENAI_KEY
+
+        # This variable is lazy loaded
+        self.stability_client: StabilityInference | None = None
 
     def __get_bot(self, username: str) -> Bot | None:
         """
@@ -174,6 +181,11 @@ class EduBot:
 
         :returns: The response from GPT
         """
+        if not OPENAI_KEY:
+            raise RuntimeError(
+                "OpenAI key is not defined, make sure to supply it in the config."
+            )
+
         with Session() as session:
             thread = self.__get_thread(thread_name)
 
@@ -286,3 +298,35 @@ class EduBot:
             session.commit()
 
             logger.info(f"Completion {completion.id} incremented by {offset}.")
+
+    def generate_image(self, prompt: str) -> Image:
+        """
+        Generate an image using Stability AI's DreamStudio.
+
+        :param prompt: A description of the image that should be generated.
+        :return: A PIL.Image instance.
+        """
+        if not DREAMSTUDIO_KEY:
+            raise RuntimeError(
+                "DreamStudio key is not defined, make sure to supply it in the config."
+            )
+
+        # Lazy load client
+        if self.stability_client is None:
+            verbose = logger.level >= 10
+            self.stability_client = StabilityInference(
+                key=DREAMSTUDIO_KEY, verbose=verbose
+            )
+
+        # Get Answer objects from stability
+        answers = self.stability_client.generate(prompt)
+
+        # Convert answer objects into artifacts we can use
+        artifacts = process_artifacts_from_answers("", "", answers, write=False)
+
+        for _, artifact in artifacts:
+            # Check that the artifact is an Image, not sure why this is necessary.
+            # See: https://github.com/Stability-AI/stability-sdk/blob/d8f140f8828022d0ad5635acbd0fecd6f6fc317a/src/stability_sdk/utils.py#L80
+            if artifact.type == generation.ARTIFACT_IMAGE:
+                img = Image.open(io.BytesIO(artifact.binary))
+                return img
