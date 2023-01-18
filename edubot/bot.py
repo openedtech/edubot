@@ -6,8 +6,9 @@ import io
 import logging
 
 import openai
+from grpc._channel import _MultiThreadedRendezvous
 from openai import OpenAIError
-from PIL import Image
+from PIL import Image, ImageDraw
 from sqlalchemy import desc, select
 from stability_sdk.client import StabilityInference, process_artifacts_from_answers
 from stability_sdk.utils import generation
@@ -261,7 +262,6 @@ class EduBot:
         delta = completion["time"] - datetime.timedelta(minutes=1, seconds=30)
 
         with Session() as session:
-
             # This select statement might get the wrong completion if the bot has sent duplicate messages in the same
             #  thread within 1.5 minutes.
             # BUT this isn't really a problem because it's very likely that users have the same reaction to
@@ -299,7 +299,7 @@ class EduBot:
 
             logger.info(f"Completion {completion.id} incremented by {offset}.")
 
-    def generate_image(self, prompt: str) -> Image:
+    def generate_image(self, prompt: str) -> Image | None:
         """
         Generate an image using Stability AI's DreamStudio.
 
@@ -324,9 +324,13 @@ class EduBot:
         # Convert answer objects into artifacts we can use
         artifacts = process_artifacts_from_answers("", "", answers, write=False)
 
-        for _, artifact in artifacts:
-            # Check that the artifact is an Image, not sure why this is necessary.
-            # See: https://github.com/Stability-AI/stability-sdk/blob/d8f140f8828022d0ad5635acbd0fecd6f6fc317a/src/stability_sdk/utils.py#L80
-            if artifact.type == generation.ARTIFACT_IMAGE:
-                img = Image.open(io.BytesIO(artifact.binary))
-                return img
+        try:
+            for _, artifact in artifacts:
+                # Check that the artifact is an Image, not sure why this is necessary.
+                # See: https://github.com/Stability-AI/stability-sdk/blob/d8f140f8828022d0ad5635acbd0fecd6f6fc317a/src/stability_sdk/utils.py#L80
+                if artifact.type == generation.ARTIFACT_IMAGE:
+                    img = Image.open(io.BytesIO(artifact.binary))
+                    return img
+        # Exception only happens when prompt is inappropriate.
+        except Exception:
+            return None
