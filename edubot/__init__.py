@@ -22,6 +22,6 @@ def _read_cfg() -> ConfigParser:
 
 CONFIG = _read_cfg()
 
-# ConfigParser will automatically throw user-friendly errors, no need to check for KeyError
-OPENAI_KEY: str = CONFIG["edubot"]["openai_key"]
-DATABASE: str = CONFIG["edubot"]["database"]
+OPENAI_KEY: str | None = CONFIG.get("edubot", "openai_key", fallback=None)
+DREAMSTUDIO_KEY: str | None = CONFIG.get("edubot", "dreamstudio_key", fallback=None)
+DATABASE: str = CONFIG.get("edubot", "database")
