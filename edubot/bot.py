@@ -4,12 +4,11 @@ Module for AI processing tasks
 import datetime
 import io
 import logging
-from typing import Union
 
 import openai
-from grpc._channel import _MultiThreadedRendezvous
+import PIL
 from openai import OpenAIError
-from PIL import Image, ImageDraw
+from PIL import Image
 from sqlalchemy import desc, select
 from stability_sdk.client import StabilityInference, process_artifacts_from_answers
 from stability_sdk.utils import generation
@@ -300,7 +299,7 @@ class EduBot:
 
             logger.info(f"Completion {completion.id} incremented by {offset}.")
 
-    def generate_image(self, prompt: str) -> Union[Image, None]:
+    def generate_image(self, prompt: str) -> Image.Image | None:
         """
         Generate an image using Stability AI's DreamStudio.
 
@@ -330,7 +329,7 @@ class EduBot:
                 # Check that the artifact is an Image, not sure why this is necessary.
                 # See: https://github.com/Stability-AI/stability-sdk/blob/d8f140f8828022d0ad5635acbd0fecd6f6fc317a/src/stability_sdk/utils.py#L80
                 if artifact.type == generation.ARTIFACT_IMAGE:
-                    img = Image.open(io.BytesIO(artifact.binary))
+                    img = PIL.Image.open(io.BytesIO(artifact.binary))
                     return img
         # Exception only happens when prompt is inappropriate.
         except Exception:
