@@ -378,8 +378,8 @@ class EduBot:
             logger.error(f"OpenAI request failed: {e}")
             return None
 
-        completion_text = completion["choices"][0]["text"]
-        completion_text = "Link summary: " + completion_text
+        completion_text: str = completion["choices"][0]["text"]
+        completion_text = "Link summary: " + completion_text.strip()
 
         with Session() as session:
             thread = self.__get_thread(thread_name)
