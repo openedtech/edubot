@@ -7,6 +7,7 @@ import logging
 
 import openai
 import PIL
+import trafilatura
 from openai import OpenAIError
 from PIL import Image
 from sqlalchemy import desc, select
@@ -21,6 +22,19 @@ from edubot.types import CompletionInfo, MessageInfo
 # The limit for text-davinci-003 is 4097.
 # We limit to 2800 to allow extra room for the response and the personality.
 MAX_GPT_TOKENS = 2800
+
+# Prompt for GPT to summarise web pages
+WEB_SUMMARY_PROMPT = "3 sentence summary of the above information: "
+
+# Settings for GPT completion generation
+GPT_SETTINGS = {
+    "engine": "text-davinci-003",
+    "temperature": 0.9,
+    "max_tokens": 500,
+    "top_p": 1,
+    "frequency_penalty": 1.0,
+    "presence_penalty": 0.6,
+}
 
 logger = logging.getLogger(__name__)
 
@@ -167,6 +181,7 @@ class EduBot:
             session.add(new_comp)
             session.commit()
 
+    # TODO: return None on error instead of empty string.
     def gpt_answer(
         self,
         context: list[MessageInfo],
@@ -224,13 +239,8 @@ class EduBot:
 
         try:
             response = openai.Completion.create(
-                engine="text-davinci-003",
                 prompt=personality + context_str + f"{self.username}: ",
-                temperature=0.9,
-                max_tokens=500,
-                top_p=1,
-                frequency_penalty=1.0,
-                presence_penalty=0.6,
+                **GPT_SETTINGS,
             )
         except OpenAIError as e:
             logger.error(f"OpenAI request failed: {e}")
@@ -334,3 +344,59 @@ class EduBot:
         # Exception only happens when prompt is inappropriate.
         except Exception:
             return None
+
+    def summarise_url(self, url: str, msg: MessageInfo, thread_name: str) -> str | None:
+        """
+        Use GPT to summarise the text content of a URL.
+
+        :param url: A valid url
+        :param msg: The message that triggered this summary request.
+        :returns: str on success, None on failure.
+        """
+        resp = trafilatura.fetch_url(url)
+
+        # If error
+        if resp == "" or resp is None:
+            return None
+
+        # Convert HTML to Plaintext
+        text = trafilatura.extract(resp)
+
+        if text is None:
+            return None
+
+        # Ensure text doesn't exceed GPT limits
+        while estimate_tokens(text) > MAX_GPT_TOKENS:
+            text = text[:-100]
+
+        try:
+            completion = openai.Completion.create(
+                prompt=text + WEB_SUMMARY_PROMPT,
+                **GPT_SETTINGS,
+            )
+        except OpenAIError as e:
+            logger.error(f"OpenAI request failed: {e}")
+            return None
+
+        completion_text = completion["choices"][0]["text"]
+        completion_text = "Link summary: " + completion_text
+
+        with Session() as session:
+            thread = self.__get_thread(thread_name)
+            if not thread:
+                thread = Thread(thread_name=thread_name, platform=self.platform)
+                session.add(thread)
+                session.commit()
+
+            if self.__get_message(msg) is None:
+                row: dict = msg
+                row["thread"] = thread.id
+                session.add(Message(**row))
+                session.commit()
+
+            # Ensure URL summaries are added to the DB
+            self.__add_completion(completion_text, msg)
+
+            session.commit()
+
+        return completion_text
