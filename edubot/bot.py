@@ -24,7 +24,9 @@ from edubot.types import CompletionInfo, MessageInfo
 MAX_GPT_TOKENS = 2800
 
 # Prompt for GPT to summarise web pages
-WEB_SUMMARY_PROMPT = "3 sentence summary of the above information: "
+WEB_SUMMARY_PROMPT = (
+    "a summary of the above information that is no longer than 3 sentences: "
+)
 
 # Settings for GPT completion generation
 GPT_SETTINGS = {
@@ -349,20 +351,26 @@ class EduBot:
         """
         Use GPT to summarise the text content of a URL.
 
-        :param url: A valid url
+        Returns None if the webpage requires JS or cannot be fetched.
+
+        :param url: A valid url.
         :param msg: The message that triggered this summary request.
-        :returns: str on success, None on failure.
+        :param thread_name: A unique identifier for the thread the URL was sent in.
         """
         resp = trafilatura.fetch_url(url)
 
-        # If error
+        # If HTTP or network error
         if resp == "" or resp is None:
             return None
 
         # Convert HTML to Plaintext
         text = trafilatura.extract(resp)
 
+        # If error converting to plaintext
         if text is None:
+            return None
+
+        if "enable javascript" in text.lower():
             return None
 
         # Ensure text doesn't exceed GPT limits
