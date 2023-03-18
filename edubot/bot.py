@@ -25,7 +25,12 @@ MAX_GPT_TOKENS = 2800
 
 # Prompt for GPT to summarise web pages
 WEB_SUMMARY_PROMPT = (
-    "a summary of the above information that is no longer than 3 sentences: "
+    "Your input is scraped text from a website. Your job is to summarise the text and post it to a chatroom.\n"
+    "Long-form text includes pages such as news articles and blog posts.\n"
+    "If the page doesn't contain long-form text return the phrase 'NO CONTENT' and nothing else.\n"
+    "If the page DOES contain long-form text return a brief 2 sentence summary of the text content. "
+    "This summary will then be sent to users.\n"
+    "Here is the scraped page text: "
 )
 
 # Settings for GPT completion generation
@@ -351,7 +356,7 @@ class EduBot:
         """
         Use GPT to summarise the text content of a URL.
 
-        Returns None if the webpage requires JS or cannot be fetched.
+        Returns None if the webpage cannot be fetched or doesn't contain long-form text to summarise.
 
         :param url: A valid url.
         :param msg: The message that triggered this summary request.
@@ -370,16 +375,13 @@ class EduBot:
         if text is None:
             return None
 
-        if "enable javascript" in text.lower():
-            return None
-
         # Ensure text doesn't exceed GPT limits
         while estimate_tokens(text) > MAX_GPT_TOKENS:
             text = text[:-100]
 
         try:
             completion = openai.Completion.create(
-                prompt=text + WEB_SUMMARY_PROMPT,
+                prompt=WEB_SUMMARY_PROMPT + text,
                 **GPT_SETTINGS,
             )
         except OpenAIError as e:
@@ -387,7 +389,11 @@ class EduBot:
             return None
 
         completion_text: str = completion["choices"][0]["text"]
-        completion_text = "Link summary: " + completion_text.strip()
+
+        if "NO CONTENT" in completion_text.upper():
+            return
+
+        completion_text = completion_text.strip()
 
         with Session() as session:
             thread = self.__get_thread(thread_name)
