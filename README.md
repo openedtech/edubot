@@ -10,9 +10,9 @@ Edubot is still under active development and is the first project from [Open EdT
 
 ## Architecture
 1. Edubot integrations convert messages from external platforms into a standardised format.
-1. The library uses these messages to generate a response from GPT-3.
+1. The library uses these messages to generate a response from GPT-4.
 1. Users send feedback to the bot's responses.
-1. Using the feedback, the library fine-tunes GPT-3's responses to better suit each thread it partakes in.
+1. Using the feedback, the library fine-tunes GPT-4's responses to better suit each thread it partakes in.
 
 ![Edubot Architecture Diagram](docs/edubot.png)
 
