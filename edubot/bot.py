@@ -19,9 +19,9 @@ from edubot.sql import Bot, Completion, Message, Session, Thread
 from edubot.types import CompletionInfo, MessageInfo
 
 # The maximum number of GPT tokens that chat context can be.
-# The limit for text-davinci-003 is 4097.
-# We limit to 2800 to allow extra room for the response and the personality.
-MAX_GPT_TOKENS = 2800
+# The limit for GPT-4 is 8192.
+# We limit to 7800 to allow extra room for the response and the personality.
+MAX_GPT_TOKENS = 7200
 
 # Prompt for GPT to summarise web pages
 WEB_SUMMARY_PROMPT = (
@@ -30,22 +30,15 @@ WEB_SUMMARY_PROMPT = (
     "If the page doesn't contain long-form text return the phrase 'NO CONTENT' and nothing else.\n"
     "If the page DOES contain long-form text return a brief 2 sentence summary of the text content. "
     "This summary will then be sent to users.\n"
-    "Here is the scraped page text: "
 )
 
 # Settings for GPT completion generation
-GPT_SETTINGS = {
-    "engine": "text-davinci-003",
-    "temperature": 0.9,
-    "max_tokens": 500,
-    "top_p": 1,
-    "frequency_penalty": 1.0,
-    "presence_penalty": 0.6,
-}
+GPT_SETTINGS = {"model": "gpt-4", "temperature": 0.3, "max_tokens": 700}
 
 logger = logging.getLogger(__name__)
 
 
+# TODO: use tiktoken for this, the function is currently inaccurate
 def estimate_tokens(text: str) -> int:
     """
     Roughly estimates how many GPT tokens a string is.
@@ -59,28 +52,6 @@ def estimate_tokens(text: str) -> int:
 
     # Average them
     return round((est1 + est2) / 2)
-
-
-def format_context(context: list[MessageInfo]) -> str:
-    """
-    Formats chat context to a string representation.
-    Note, this will truncate context if it exceeds GPT token limits.
-
-    :param context: A list of MessageInfo.
-    :return: The context as a string.
-    """
-    while True:
-        context_str = ""
-        # Convert the list into a string.
-        for msg in context:
-            context_str += f"{msg['username']}: {msg['message']}\n"
-
-        # If the string doesn't exceed GPT limits
-        if estimate_tokens(context_str) < MAX_GPT_TOKENS:
-            return context_str
-
-        # The string does exceed the limits, so we remove the first item to make it shorter
-        context = context[1:]
 
 
 class EduBot:
@@ -188,6 +159,52 @@ class EduBot:
             session.add(new_comp)
             session.commit()
 
+    def __format_context(
+        self, context: list[MessageInfo], personality_override: str = None
+    ) -> list[dict]:
+        """
+        Formats chat context to the format expected by GPT.
+
+        :param context: A list of MessageInfo.
+        :return: The context as a list of dicts in GPT format.
+        """
+        personality = self.personality
+        if personality_override:
+            personality = personality_override
+
+        gpt_context: list[dict] = []
+
+        token_count = 0
+
+        for msg in context:
+            if msg["username"] == self.username:
+                role = "assistant"
+            else:
+                role = "user"
+
+            content = f"{msg['username']}: {msg['message']}"
+            gpt_context.append({"role": role, "content": content})
+
+            token_count += estimate_tokens(content)
+
+        while token_count > MAX_GPT_TOKENS:
+            token_count -= estimate_tokens(gpt_context.pop(0)["content"])
+
+        system_messages = [
+            {"role": "system", "content": "You are a chatbot named " + self.username},
+            {"role": "system", "content": f"Your personality is: {personality}"},
+            {
+                "role": "system",
+                "content": f"The current year is: {datetime.datetime.now().year}",
+            },
+            {
+                "role": "system",
+                "content": f"You use the language model {GPT_SETTINGS['model']}",
+            },
+        ]
+
+        return system_messages + gpt_context
+
     # TODO: return None on error instead of empty string.
     def gpt_answer(
         self,
@@ -234,26 +251,20 @@ class EduBot:
 
             session.commit()
 
-        # Construct context for OpenAI completion
-        context_str = format_context(context)
-
-        personality = self.personality
-        if personality_override:
-            personality = personality_override
-
-        if not personality.endswith("\n"):
-            personality += "\n"
+        gpt_context = self.__format_context(
+            context, personality_override=personality_override
+        )
 
         try:
-            response = openai.Completion.create(
-                prompt=personality + context_str + f"{self.username}: ",
+            response = openai.ChatCompletion.create(
+                messages=gpt_context,
                 **GPT_SETTINGS,
             )
         except OpenAIError as e:
             logger.error(f"OpenAI request failed: {e}")
             return ""
 
-        completion: str = response["choices"][0]["text"]
+        completion: str = response["choices"][0]["message"]["content"]
 
         # Strip username from completion
         completion = completion.replace(f"{self.username}: ", "").lstrip()
@@ -379,16 +390,20 @@ class EduBot:
         while estimate_tokens(text) > MAX_GPT_TOKENS:
             text = text[:-100]
 
+        gpt_context = [
+            {"role": "system", "content": WEB_SUMMARY_PROMPT},
+            {"role": "user", "content": text},
+        ]
         try:
-            completion = openai.Completion.create(
-                prompt=WEB_SUMMARY_PROMPT + text,
+            completion = openai.ChatCompletion.create(
+                messages=gpt_context,
                 **GPT_SETTINGS,
             )
         except OpenAIError as e:
             logger.error(f"OpenAI request failed: {e}")
             return None
 
-        completion_text: str = completion["choices"][0]["text"]
+        completion_text: str = completion["choices"][0]["message"]["content"]
 
         if "NO CONTENT" in completion_text.upper():
             return

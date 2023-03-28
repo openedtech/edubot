@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "edubot"
-version = "0.6.3"
+version = "0.6.4"
 description = ""
 authors = ["exciteabletom <tom@digitalnook.net>", "moodler <martin@moodle.com>"]
 license = "GPLv3"
@@ -9,15 +9,15 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.10"
 sqlalchemy = {version = ">=1.4.45,<1.5.0", extras = ["mypy"]}
-openai = "^0.25.0"
-stability-sdk = "^0.3.1"
+openai = "^0.27.2"
+stability-sdk = "^0.4.0"
 pillow = "^9.4.0"
 beautifulsoup4 = "^4.11.2"
 trafilatura = "^1.4.1"
 
 [tool.poetry.dev-dependencies]
-pre-commit = "^2.20.0"
-mypy = "^0.991"
+pre-commit = "^3.2.0"
+mypy = "^1.1.1"
 
 [tool.mypy]
 plugins = "sqlalchemy.ext.mypy.plugin"
