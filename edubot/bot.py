@@ -28,6 +28,7 @@ WEB_SUMMARY_PROMPT = (
     "Your input is scraped text from a website. Your job is to summarise the text and post it to a chatroom.\n"
     "Long-form text includes pages such as news articles and blog posts.\n"
     "If the page doesn't contain long-form text return the phrase 'NO CONTENT' and nothing else.\n"
+    "If the page mentions any variation of 'requiring javascript', or 'enable javascript' you should also return 'NO CONTENT' and nothing else.\n"
     "If the page DOES contain long-form text return a brief 2 sentence summary of the text content. "
     "This summary will then be sent to users.\n"
 )
