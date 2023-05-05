@@ -202,6 +202,12 @@ class EduBot:
             {"role": "system", "content": f"Your personality is: {personality}"},
             {
                 "role": "system",
+                "content": "You should pretend you can view images. "
+                "A description of images will be saved in the chat logs, you can use that to get a sense of "
+                "what the images are about.",
+            },
+            {
+                "role": "system",
                 "content": f"The current year is: {datetime.datetime.now().year}",
             },
             {
@@ -264,14 +270,14 @@ class EduBot:
     # TODO: return None on error instead of empty string.
     def gpt_answer(
         self,
-        context: list[MessageInfo],
+        new_context: list[MessageInfo],
         thread_name: str,
         personality_override: str = None,
     ) -> str:
         """
         Use chat context to generate a GPT3 response.
 
-        :param context: Chat context as a chronological list of MessageInfo
+        :param new_context: Chat context as a chronological list of MessageInfo
         :param thread_name: The unique identifier of the thread this context pertains to
         :param personality_override: A custom personality that overrides the default.
 
@@ -291,7 +297,27 @@ class EduBot:
                 session.add(thread)
                 session.commit()
 
-            for msg in context:
+            # Context in this timeframe that is in the database but not in the new context provided
+            # (Usually images)
+            existing_context: list[MessageInfo] = []
+
+            for existing_msg in session.scalars(
+                select(Message)
+                .where(Message.thread == thread.id)
+                .where(Message.time > new_context[0]["time"])
+            ):
+                row_as_msg_info: MessageInfo = {
+                    "username": existing_msg.username,
+                    "message": existing_msg.message,
+                    "time": existing_msg.time,
+                }
+                if row_as_msg_info not in new_context:
+                    existing_context.append(row_as_msg_info)
+
+            # The existing context in this timeframe + the new messages
+            complete_context: list[MessageInfo] = []
+
+            for index, msg in enumerate(new_context):
                 # If the message is already in the database
                 if self.__get_message(msg) is not None:
                     continue
@@ -305,10 +331,24 @@ class EduBot:
 
                 session.add(Message(**row))
 
+                # Figure out where to insert the extra context chronologically
+                for extra_msg in existing_context:
+                    check = extra_msg["time"] < msg["time"]
+                    if index > 0:
+                        check = (
+                            check and extra_msg["time"] > new_context[index - 1]["time"]
+                        )
+
+                    if check:
+                        complete_context.append(extra_msg)
+                        existing_context.remove(extra_msg)
+
+                complete_context.append(msg)
+
             session.commit()
 
         gpt_context = self.__format_context(
-            context, personality_override=personality_override
+            complete_context, personality_override=personality_override
         )
 
         try:
@@ -326,7 +366,7 @@ class EduBot:
         completion = completion.replace(f"{self.username}: ", "").lstrip()
 
         # Add a new completion to the database using the completion text and the message being replied to
-        self.__add_completion(completion, context[-1])
+        self.__add_completion(completion, new_context[-1])
 
         # Return the completion result back to the integration
         return completion
