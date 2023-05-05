@@ -7,6 +7,7 @@ import logging
 
 import openai
 import PIL
+import replicate
 import trafilatura
 from openai import OpenAIError
 from PIL import Image
@@ -14,14 +15,17 @@ from sqlalchemy import desc, select
 from stability_sdk.client import StabilityInference, process_artifacts_from_answers
 from stability_sdk.utils import generation
 
-from edubot import DREAMSTUDIO_KEY, OPENAI_KEY
+from edubot import DREAMSTUDIO_KEY, OPENAI_KEY, REPLICATE_KEY
 from edubot.sql import Bot, Completion, Message, Session, Thread
-from edubot.types import CompletionInfo, MessageInfo
+from edubot.types import CompletionInfo, ImageInfo, MessageInfo
 
 # The maximum number of GPT tokens that chat context can be.
 # The limit for GPT-4 is 8192.
 # We limit to 7800 to allow extra room for the response and the personality.
 MAX_GPT_TOKENS = 7200
+
+# The maximum allowed size of images in megabytes
+MAX_IMAGE_SIZE_MB = 50
 
 # Prompt for GPT to summarise web pages
 WEB_SUMMARY_PROMPT = (
@@ -37,6 +41,9 @@ WEB_SUMMARY_PROMPT = (
 GPT_SETTINGS = {"model": "gpt-4", "temperature": 0.3, "max_tokens": 700}
 
 logger = logging.getLogger(__name__)
+logger.level = "DEBUG"
+
+REPLICATE_CLIENT = replicate.Client(api_token=REPLICATE_KEY)
 
 
 # TODO: use tiktoken for this, the function is currently inaccurate
@@ -205,6 +212,55 @@ class EduBot:
         ]
 
         return system_messages + gpt_context
+
+    def save_image_to_context(self, image: ImageInfo, thread_name: str) -> str | None:
+        """
+        Saves an AI generated description of an image to the database. This allows GPT to understand what images are
+         and how to describe them. The maximum image size in MB can be read from the MAX_IMAGE_SIZE_MB constant.
+
+        :param image: An ImageInfo object.
+        :param thread_name: A unique identifier for the thread the image was posted in.
+        :returns: The description of the image or None if an error occurred.
+        """
+        if not REPLICATE_KEY:
+            raise RuntimeError(
+                "Replicate key is not defined, make sure to supply it in the config."
+            )
+
+        image_bytes = io.BytesIO()
+        image["image"].save(image_bytes, format="PNG")
+
+        if image_bytes.tell() / 1048576 > MAX_IMAGE_SIZE_MB:
+            logger.info(f"Skipped image in {thread_name} because it was too large.")
+            return
+
+        output: str = REPLICATE_CLIENT.run(
+            "j-min/clip-caption-reward:de37751f75135f7ebbe62548e27d6740d5155dfefdf6447db35c9865253d7e06",
+            input={"image": image_bytes},
+        )
+
+        if not output:
+            logger.error("Replicate returned an empty response.")
+            return
+
+        with Session() as session:
+            thread = self.__get_thread(thread_name)
+            if not thread:
+                thread = Thread(thread_name=thread_name, platform=self.platform)
+                session.add(thread)
+                session.commit()
+
+            message = Message(
+                thread=thread.id,
+                username=image["username"],
+                message=f"*An image of {output}",
+                time=image["time"],
+            )
+
+            session.add(message)
+            session.commit()
+
+        return output
 
     # TODO: return None on error instead of empty string.
     def gpt_answer(

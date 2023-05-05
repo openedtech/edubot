@@ -24,4 +24,5 @@ CONFIG = _read_cfg()
 
 OPENAI_KEY: str | None = CONFIG.get("edubot", "openai_key", fallback=None)
 DREAMSTUDIO_KEY: str | None = CONFIG.get("edubot", "dreamstudio_key", fallback=None)
+REPLICATE_KEY: str | None = CONFIG.get("edubot", "replicate_key", fallback=None)
 DATABASE: str = CONFIG.get("edubot", "database")
