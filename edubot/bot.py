@@ -41,7 +41,6 @@ WEB_SUMMARY_PROMPT = (
 GPT_SETTINGS = {"model": "gpt-4", "temperature": 0.3, "max_tokens": 700}
 
 logger = logging.getLogger(__name__)
-logger.level = "DEBUG"
 
 REPLICATE_CLIENT = replicate.Client(api_token=REPLICATE_KEY)
 
