@@ -21,7 +21,7 @@ from edubot.types import CompletionInfo, ImageInfo, MessageInfo
 
 # The maximum number of GPT tokens that chat context can be.
 # The limit for GPT-4 is 8192.
-# We limit to 7800 to allow extra room for the response and the personality.
+# We limit to 7200 to allow extra room for the response and the personality.
 MAX_GPT_TOKENS = 7200
 
 # The maximum allowed size of images in megabytes
