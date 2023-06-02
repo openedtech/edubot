@@ -21,7 +21,7 @@ from edubot.types import CompletionInfo, ImageInfo, MessageInfo
 
 # The maximum number of GPT tokens that chat context can be.
 # The limit for GPT-4 is 8192.
-# We limit to 7800 to allow extra room for the response and the personality.
+# We limit to 7200 to allow extra room for the response and the personality.
 MAX_GPT_TOKENS = 7200
 
 # The maximum allowed size of images in megabytes
@@ -203,8 +203,11 @@ class EduBot:
             {
                 "role": "system",
                 "content": "You should pretend you can view images. "
-                "A description of images will be saved in the chat logs, you can use that to get a sense of "
-                "what the images are about.",
+                "Descriptions of images posted to the chat will be saved to the database. "
+                "These descriptions are in the form: '*A picture of ____'. "
+                "When you spot these descriptions you should pretend you can see the image, using the description. "
+                "Do not mention that you cannot see the image, or that you are instead viewing a description of"
+                "the image. Just pretend like you can see it.",
             },
             {
                 "role": "system",
@@ -318,19 +321,6 @@ class EduBot:
             complete_context: list[MessageInfo] = []
 
             for index, msg in enumerate(new_context):
-                # If the message is already in the database
-                if self.__get_message(msg) is not None:
-                    continue
-
-                # If the message was written by a bot
-                if self.__get_bot(msg["username"]) is not None:
-                    continue
-
-                row: dict = msg
-                row["thread"] = thread.id
-
-                session.add(Message(**row))
-
                 # Figure out where to insert the extra context chronologically
                 for extra_msg in existing_context:
                     check = extra_msg["time"] < msg["time"]
@@ -344,6 +334,19 @@ class EduBot:
                         existing_context.remove(extra_msg)
 
                 complete_context.append(msg)
+
+                # If the message is already in the database
+                if self.__get_message(msg) is not None:
+                    continue
+
+                # If the message was written by a bot
+                if self.__get_bot(msg["username"]) is not None:
+                    continue
+
+                row: dict = msg
+                row["thread"] = thread.id
+
+                session.add(Message(**row))
 
             session.commit()
 
