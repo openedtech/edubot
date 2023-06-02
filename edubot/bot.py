@@ -19,10 +19,12 @@ from edubot import DREAMSTUDIO_KEY, OPENAI_KEY, REPLICATE_KEY
 from edubot.sql import Bot, Completion, Message, Session, Thread
 from edubot.types import CompletionInfo, ImageInfo, MessageInfo
 
+# The limit for GPT-4 is 8192 tokens.
+MAX_GPT_TOKENS = 8192
 # The maximum number of GPT tokens that chat context can be.
-# The limit for GPT-4 is 8192.
-# We limit to 7200 to allow extra room for the response and the personality.
-MAX_GPT_TOKENS = 7200
+MAX_PROMPT_TOKENS = MAX_GPT_TOKENS - 1192
+# The maximum number of GPT tokens that can be used for completion.
+MAX_COMPLETION_TOKENS = MAX_GPT_TOKENS - MAX_PROMPT_TOKENS
 
 # The maximum allowed size of images in megabytes
 MAX_IMAGE_SIZE_MB = 50
@@ -38,7 +40,11 @@ WEB_SUMMARY_PROMPT = (
 )
 
 # Settings for GPT completion generation
-GPT_SETTINGS = {"model": "gpt-4", "temperature": 0.3, "max_tokens": 700}
+GPT_SETTINGS = {
+    "model": "gpt-4",
+    "temperature": 0.3,
+    "max_tokens": MAX_COMPLETION_TOKENS,
+}
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +155,23 @@ class EduBot:
             else:
                 return None
 
+    def __get_completion_from_message(self, msg_info: MessageInfo) -> Completion | None:
+        """
+        Gets the bots response to a specific message.
+        """
+        with Session() as session:
+            msg = self.__get_message(msg_info)
+            completion = session.execute(
+                select(Completion)
+                .where(Completion.bot == self.__bot_pk)
+                .where(Completion.reply_to == msg.id)
+            ).fetchone()
+
+            if completion:
+                return completion[0]
+            else:
+                return None
+
     def __add_completion(self, completion: str, reply_to: MessageInfo) -> None:
         """
         Add a completion to the database.
@@ -194,7 +217,7 @@ class EduBot:
 
             token_count += estimate_tokens(content)
 
-        while token_count > MAX_GPT_TOKENS:
+        while token_count > MAX_PROMPT_TOKENS:
             token_count -= estimate_tokens(gpt_context.pop(0)["content"])
 
         system_messages = [
@@ -221,14 +244,10 @@ class EduBot:
 
         return system_messages + gpt_context
 
-    def save_image_to_context(self, image: ImageInfo, thread_name: str) -> str | None:
+    @staticmethod
+    def __describe_image(image: Image.Image) -> str:
         """
-        Saves an AI generated description of an image to the database. This allows GPT to understand what images are
-         and how to describe them. The maximum image size in MB can be read from the MAX_IMAGE_SIZE_MB constant.
-
-        :param image: An ImageInfo object.
-        :param thread_name: A unique identifier for the thread the image was posted in.
-        :returns: The description of the image or None if an error occurred.
+        Gets an AI generated description of an image.
         """
         if not REPLICATE_KEY:
             raise RuntimeError(
@@ -236,11 +255,11 @@ class EduBot:
             )
 
         image_bytes = io.BytesIO()
-        image["image"].save(image_bytes, format="PNG")
+        image.save(image_bytes, format="PNG")
 
         if image_bytes.tell() / 1048576 > MAX_IMAGE_SIZE_MB:
-            logger.info(f"Skipped image in {thread_name} because it was too large.")
-            return
+            logger.info(f"Skipped image because it was too large.")
+            return None
 
         output: str = REPLICATE_CLIENT.run(
             "j-min/clip-caption-reward:de37751f75135f7ebbe62548e27d6740d5155dfefdf6447db35c9865253d7e06",
@@ -249,7 +268,20 @@ class EduBot:
 
         if not output:
             logger.error("Replicate returned an empty response.")
-            return
+            return None
+
+        return output
+
+    def save_image_to_context(self, image: ImageInfo, thread_name: str) -> str | None:
+        """
+        Saves an AI generated description of a user-sent image to the database. This allows GPT to understand what images are
+         and how to describe them. The maximum image size in MB can be read from the MAX_IMAGE_SIZE_MB constant.
+
+        :param image: An ImageInfo object.
+        :param thread_name: A unique identifier for the thread the image was posted in.
+        :returns: The description of the image or None if an error occurred.
+        """
+        image_description = self.__describe_image(image["image"])
 
         with Session() as session:
             thread = self.__get_thread(thread_name)
@@ -261,14 +293,14 @@ class EduBot:
             message = Message(
                 thread=thread.id,
                 username=image["username"],
-                message=f"*An image of {output}",
+                message=f"*An image of {image_description}",
                 time=image["time"],
             )
-
             session.add(message)
+
             session.commit()
 
-        return output
+        return image_description
 
     # TODO: return None on error instead of empty string.
     def gpt_answer(
@@ -318,7 +350,7 @@ class EduBot:
                     existing_context.append(row_as_msg_info)
 
             # The existing context in this timeframe + the new messages
-            complete_context: list[MessageInfo] = []
+            new_and_existing_context: list[MessageInfo] = []
 
             for index, msg in enumerate(new_context):
                 # Figure out where to insert the extra context chronologically
@@ -330,10 +362,10 @@ class EduBot:
                         )
 
                     if check:
-                        complete_context.append(extra_msg)
+                        new_and_existing_context.append(extra_msg)
                         existing_context.remove(extra_msg)
 
-                complete_context.append(msg)
+                new_and_existing_context.append(msg)
 
                 # If the message is already in the database
                 if self.__get_message(msg) is not None:
@@ -350,6 +382,24 @@ class EduBot:
 
             session.commit()
 
+        # Ensure that all bot completions are included in context, notably image completions.
+        complete_context: list[MessageInfo] = []
+        for message in new_and_existing_context:
+            if self.__get_bot(message["username"]) is not None:
+                continue
+            complete_context.append(message)
+
+            if completion := self.__get_completion_from_message(message):
+                complete_context.append(
+                    {
+                        "username": completion.bot,
+                        "message": completion.message,
+                        "time": message[
+                            "time"
+                        ],  # Estimate this, it doesn't matter for gpt_context
+                    }
+                )
+
         gpt_context = self.__format_context(
             complete_context, personality_override=personality_override
         )
@@ -365,11 +415,11 @@ class EduBot:
 
         completion: str = response["choices"][0]["message"]["content"]
 
-        # Strip username from completion
-        completion = completion.replace(f"{self.username}: ", "").lstrip()
+        # Strip username from completion, sometimes GPT messes this up.
+        completion = completion.replace(f"{self.username}:", "").lstrip()
 
         # Add a new completion to the database using the completion text and the message being replied to
-        self.__add_completion(completion, new_context[-1])
+        self.__add_completion(completion, complete_context[-1])
 
         # Return the completion result back to the integration
         return completion
@@ -426,12 +476,16 @@ class EduBot:
 
             logger.info(f"Completion {completion.id} incremented by {offset}.")
 
-    def generate_image(self, prompt: str) -> Image.Image | None:
+    def generate_image(
+        self, prompt: str, reply_to_msg: MessageInfo, thread_name: str
+    ) -> Image.Image | None:
         """
         Generate an image using Stability AI's DreamStudio.
 
         :param prompt: A description of the image that should be generated.
-        :return: A PIL.Image instance.
+        :param reply_to_msg: The message the bot is replying to.
+        :param thread_name: A unique identifier for the thread the message resides in.
+        :return: A PIL.Image.Image instance.
         """
         if not DREAMSTUDIO_KEY:
             raise RuntimeError(
@@ -451,16 +505,47 @@ class EduBot:
         # Convert answer objects into artifacts we can use
         artifacts = process_artifacts_from_answers("", "", answers, write=False)
 
+        image: Image.Image | None = None
         try:
             for _, artifact in artifacts:
                 # Check that the artifact is an Image, not sure why this is necessary.
                 # See: https://github.com/Stability-AI/stability-sdk/blob/d8f140f8828022d0ad5635acbd0fecd6f6fc317a/src/stability_sdk/utils.py#L80
                 if artifact.type == generation.ARTIFACT_IMAGE:
-                    img = PIL.Image.open(io.BytesIO(artifact.binary))
-                    return img
+                    image = PIL.Image.open(io.BytesIO(artifact.binary))
+                    break
         # Exception only happens when prompt is inappropriate.
         except Exception:
             return None
+
+        if image is None:
+            return None
+
+        with Session() as session:
+            thread = self.__get_thread(thread_name)
+
+            if not thread:
+                thread = Thread(thread_name=thread_name, platform=self.platform)
+
+                session.add(thread)
+                session.commit()
+
+            message = Message(
+                username=reply_to_msg["username"],
+                message=reply_to_msg["message"],
+                time=reply_to_msg["time"],
+                thread=thread.id,
+            )
+            session.add(message)
+            session.commit()
+
+        image_description = self.__describe_image(image)
+        completion = (
+            f"*An image you generated based on the prompt: '{prompt}'.\n"
+            f"*Your interpretation of the image is: '{image_description}'."
+        )
+        self.__add_completion(completion, reply_to_msg)
+
+        return image
 
     def summarise_url(self, url: str, msg: MessageInfo, thread_name: str) -> str | None:
         """
@@ -486,7 +571,7 @@ class EduBot:
             return None
 
         # Ensure text doesn't exceed GPT limits
-        while estimate_tokens(text) > MAX_GPT_TOKENS:
+        while estimate_tokens(text) > MAX_PROMPT_TOKENS:
             text = text[:-100]
 
         gpt_context = [
