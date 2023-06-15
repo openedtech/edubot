@@ -66,7 +66,7 @@ class EduBot:
     An AI chatbot which continually improves itself using user feedback.
     """
 
-    def __init__(self, username: str, platform: str, personality: str | list[str] = []):
+    def __init__(self, username: str, platform: str, personality: str | list[str]):
         """
         Initialise EduBot with personalised information about the bot.
 
@@ -77,7 +77,9 @@ class EduBot:
         self.username = username
         self.platform = platform
 
-        if type(personality) is str:
+        if personality is None:
+            self.personality = []
+        elif type(personality) is str:
             self.personality = [personality]
         else:
             self.personality = personality
@@ -197,7 +199,8 @@ class EduBot:
         """
         if personality_override:
             # We need to shallow copy 'self.personality' to avoid modifying the original list
-            personality = self.personality.copy().append(personality_override)
+            personality = self.personality.copy()
+            personality.append(personality_override)
         else:
             personality = self.personality
 
