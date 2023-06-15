@@ -8,6 +8,7 @@ import logging
 import openai
 import PIL
 import replicate
+import tiktoken
 import trafilatura
 from openai import OpenAIError
 from PIL import Image
@@ -51,20 +52,13 @@ logger = logging.getLogger(__name__)
 REPLICATE_CLIENT = replicate.Client(api_token=REPLICATE_KEY)
 
 
-# TODO: use tiktoken for this, the function is currently inaccurate
 def estimate_tokens(text: str) -> int:
-    """
-    Roughly estimates how many GPT tokens a string is.
-    See: https://help.openai.com/en/articles/4936856-what-are-tokens-and-how-to-count-them
+    # Load GPT-4 encoding
+    enc = tiktoken.encoding_for_model(GPT_SETTINGS["model"])
 
-    :return: The estimated amount of tokens.
-    """
-    # Get two estimates
-    est1 = len(text) / 4
-    est2 = len(text.split(" ")) * 0.75
-
-    # Average them
-    return round((est1 + est2) / 2)
+    # Turn text into tokens and count them
+    token_count = len(enc.encode(text))
+    return token_count
 
 
 class EduBot:
