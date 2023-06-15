@@ -72,18 +72,21 @@ class EduBot:
     An AI chatbot which continually improves itself using user feedback.
     """
 
-    def __init__(self, username: str, platform: str, personality: str = ""):
+    def __init__(self, username: str, platform: str, personality: str | list[str] = []):
         """
         Initialise EduBot with personalised information about the bot.
 
         :param username: A unique name to identify this bot from others on the same platform.
         :param platform: The platform the bot is running on E.g. 'telegram' 'matrix' 'mastodon'
-        :param personality: Some example conversation to influence the bots personality and mission.
-            Must be in "username: message\n ..." format.
+        :param personality: Instructions/information for the bot to follow when generating responses.
         """
         self.username = username
         self.platform = platform
-        self.personality = personality
+
+        if type(personality) is str:
+            self.personality = [personality]
+        else:
+            self.personality = personality
 
         self.__add_bot_to_db()
 
@@ -198,9 +201,11 @@ class EduBot:
         :param context: A list of MessageInfo.
         :return: The context as a list of dicts in GPT format.
         """
-        personality = self.personality
         if personality_override:
-            personality = personality_override
+            # We need to shallow copy 'self.personality' to avoid modifying the original list
+            personality = self.personality.copy().append(personality_override)
+        else:
+            personality = self.personality
 
         gpt_context: list[dict] = []
 
@@ -221,8 +226,17 @@ class EduBot:
             token_count -= estimate_tokens(gpt_context.pop(0)["content"])
 
         system_messages = [
-            {"role": "system", "content": "You are a chatbot named " + self.username},
-            {"role": "system", "content": f"Your personality is: {personality}"},
+            {
+                "role": "system",
+                "content": f"You are a chatbot named '{self.username}' which is controlled by an open source python"
+                f" program called EduBot that is running on a server owned by the Open EdTech"
+                f" organisation. On the backend, the edubot program connects to the API of an"
+                f" LLM ({GPT_SETTINGS['model']}) which processes prompts and returns responses. "
+                f"On the frontend, the Edubot program connects via API to the {self.platform}"
+                f" platform to write posts and read the posts of others. "
+                f"You, EduBot, are not able to change yourself - all requests to modify your"
+                f" code should be directed to Github: https://github.com/openedtech/edubot.",
+            },
             {
                 "role": "system",
                 "content": "You should pretend you can view images. "
@@ -241,6 +255,9 @@ class EduBot:
                 "content": f"You use the language model {GPT_SETTINGS['model']}",
             },
         ]
+
+        for i in personality:
+            system_messages.append({"role": "system", "content": i})
 
         return system_messages + gpt_context
 

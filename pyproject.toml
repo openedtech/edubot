@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "edubot"
-version = "0.7.0"
+version = "0.7.1"
 description = ""
 authors = ["exciteabletom <tom@digitalnook.net>", "moodler <martin@moodle.com>"]
 license = "GPLv3"
