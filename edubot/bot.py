@@ -251,6 +251,10 @@ class EduBot:
                 "role": "system",
                 "content": f"You use the language model {GPT_SETTINGS['model']}",
             },
+            {
+                "role": "system",
+                "content": f"Never prefix your messages with '{self.username}:'",
+            },
         ]
 
         for i in personality:
@@ -406,7 +410,7 @@ class EduBot:
             if completion := self.__get_completion_from_message(message):
                 complete_context.append(
                     {
-                        "username": completion.bot,
+                        "username": self.username,
                         "message": completion.message,
                         "time": message[
                             "time"
