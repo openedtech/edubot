@@ -1,6 +1,7 @@
 """
 Custom types
 """
+# TODO: Consider replacing these with langchain objects/db
 from datetime import datetime
 from typing import TypedDict
 

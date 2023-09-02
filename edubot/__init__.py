@@ -23,6 +23,15 @@ def _read_cfg() -> ConfigParser:
 CONFIG = _read_cfg()
 
 OPENAI_KEY: str | None = CONFIG.get("edubot", "openai_key", fallback=None)
+
+if not OPENAI_KEY:
+    raise RuntimeError(
+        "OpenAI key is not defined, make sure to supply it in the config."
+    )
+
+# Add openai key to env variables for langchain
+environ["OPENAI_API_KEY"] = OPENAI_KEY
+
 DREAMSTUDIO_KEY: str | None = CONFIG.get("edubot", "dreamstudio_key", fallback=None)
 REPLICATE_KEY: str | None = CONFIG.get("edubot", "replicate_key", fallback=None)
 DATABASE: str = CONFIG.get("edubot", "database")

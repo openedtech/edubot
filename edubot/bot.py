@@ -10,13 +10,15 @@ import PIL
 import replicate
 import tiktoken
 import trafilatura
+from langchain.chat_models import ChatOpenAI
+from langchain.schema import AIMessage, HumanMessage, SystemMessage
 from openai import OpenAIError
 from PIL import Image
 from sqlalchemy import desc, select
 from stability_sdk.client import StabilityInference, process_artifacts_from_answers
 from stability_sdk.utils import generation
 
-from edubot import DREAMSTUDIO_KEY, OPENAI_KEY, REPLICATE_KEY
+from edubot import DREAMSTUDIO_KEY, REPLICATE_KEY
 from edubot.sql import Bot, Completion, Message, Session, Thread
 from edubot.types import CompletionInfo, ImageInfo, MessageInfo
 
@@ -26,6 +28,15 @@ MAX_GPT_TOKENS = 8192
 MAX_PROMPT_TOKENS = MAX_GPT_TOKENS - 1192
 # The maximum number of GPT tokens that can be used for completion.
 MAX_COMPLETION_TOKENS = MAX_GPT_TOKENS - MAX_PROMPT_TOKENS
+
+# Settings for GPT completion generation
+GPT_SETTINGS = {
+    "model": "gpt-4",
+    "temperature": 0.3,
+    "max_tokens": MAX_COMPLETION_TOKENS,
+}
+
+LLM = ChatOpenAI(**GPT_SETTINGS)
 
 # The maximum allowed size of images in megabytes
 MAX_IMAGE_SIZE_MB = 50
@@ -39,13 +50,6 @@ WEB_SUMMARY_PROMPT = (
     "If the page DOES contain long-form text return a brief 2 sentence summary of the text content. "
     "This summary will then be sent to users.\n"
 )
-
-# Settings for GPT completion generation
-GPT_SETTINGS = {
-    "model": "gpt-4",
-    "temperature": 0.3,
-    "max_tokens": MAX_COMPLETION_TOKENS,
-}
 
 logger = logging.getLogger(__name__)
 
@@ -89,10 +93,28 @@ class EduBot:
         # The primary key of the bot in the database
         self.__bot_pk = self.__get_bot(username).id
 
-        openai.api_key = OPENAI_KEY
-
         # This variable is lazy loaded
         self.stability_client: StabilityInference | None = None
+
+        self.system_messages = [
+            f"You are a chatbot named '{self.username}' which is controlled by an open source python"
+            f" program called EduBot that is running on a server owned by the Open EdTech"
+            f" organisation. On the backend, the edubot program connects to the API of an"
+            f" LLM ({GPT_SETTINGS['model']}) which processes prompts and returns responses. "
+            f"On the frontend, the Edubot program connects via API to the {self.platform}"
+            f" platform to write posts and read the posts of others. "
+            f"You, EduBot, are not able to change yourself - all requests to modify your"
+            f" code should be directed to Github: https://github.com/openedtech/edubot.",
+            "You should pretend you can view images. "
+            "Descriptions of images posted to the chat will be saved to the database. "
+            "These descriptions are in the form: '*A picture of ____'. "
+            "When you spot these descriptions you should pretend you can see the image, using the description. "
+            "Do not mention that you cannot see the image, or that you are instead viewing a description of"
+            "the image. Just pretend like you can see it.",
+            f"The current year is: {datetime.datetime.now().year}",
+            f"You use the language model {GPT_SETTINGS['model']}",
+            f"Never prefix your messages with '{self.username}:'",
+        ]
 
     def __get_bot(self, username: str) -> Bot | None:
         """
@@ -190,12 +212,12 @@ class EduBot:
 
     def __format_context(
         self, context: list[MessageInfo], personality_override: str = None
-    ) -> list[dict]:
+    ) -> list[SystemMessage | HumanMessage | AIMessage]:
         """
-        Formats chat context to the format expected by GPT.
+        Formats chat context and system messages into a chronological list of langchain messages.
 
         :param context: A list of MessageInfo.
-        :return: The context as a list of dicts in GPT format.
+        :return: The context as a list of langchain message objects.
         """
         if personality_override:
             # We need to shallow copy 'self.personality' to avoid modifying the original list
@@ -204,63 +226,28 @@ class EduBot:
         else:
             personality = self.personality
 
-        gpt_context: list[dict] = []
+        langchain_messages: list[SystemMessage | HumanMessage | AIMessage] = []
 
+        # Append the system messages and personality to the chat context
+        for i in self.system_messages + personality:
+            langchain_messages.append(SystemMessage(content=i))
+
+        # The context is too long if the prompt is longer than MAX_PROMPT_TOKENS
         token_count = 0
 
         for msg in context:
             if msg["username"] == self.username:
-                role = "assistant"
+                langchain_messages.append(AIMessage(content=msg["message"]))
             else:
-                role = "user"
+                langchain_messages.append(HumanMessage(content=msg["message"]))
 
-            content = f"{msg['username']}: {msg['message']}"
-            gpt_context.append({"role": role, "content": content})
+            token_count += estimate_tokens(msg["message"])
 
-            token_count += estimate_tokens(content)
-
+        # Remove messages from the context until the prompt is short enough
         while token_count > MAX_PROMPT_TOKENS:
-            token_count -= estimate_tokens(gpt_context.pop(0)["content"])
+            token_count -= estimate_tokens(langchain_messages.pop(0).content)
 
-        system_messages = [
-            {
-                "role": "system",
-                "content": f"You are a chatbot named '{self.username}' which is controlled by an open source python"
-                f" program called EduBot that is running on a server owned by the Open EdTech"
-                f" organisation. On the backend, the edubot program connects to the API of an"
-                f" LLM ({GPT_SETTINGS['model']}) which processes prompts and returns responses. "
-                f"On the frontend, the Edubot program connects via API to the {self.platform}"
-                f" platform to write posts and read the posts of others. "
-                f"You, EduBot, are not able to change yourself - all requests to modify your"
-                f" code should be directed to Github: https://github.com/openedtech/edubot.",
-            },
-            {
-                "role": "system",
-                "content": "You should pretend you can view images. "
-                "Descriptions of images posted to the chat will be saved to the database. "
-                "These descriptions are in the form: '*A picture of ____'. "
-                "When you spot these descriptions you should pretend you can see the image, using the description. "
-                "Do not mention that you cannot see the image, or that you are instead viewing a description of"
-                "the image. Just pretend like you can see it.",
-            },
-            {
-                "role": "system",
-                "content": f"The current year is: {datetime.datetime.now().year}",
-            },
-            {
-                "role": "system",
-                "content": f"You use the language model {GPT_SETTINGS['model']}",
-            },
-            {
-                "role": "system",
-                "content": f"Never prefix your messages with '{self.username}:'",
-            },
-        ]
-
-        for i in personality:
-            system_messages.append({"role": "system", "content": i})
-
-        return system_messages + gpt_context
+        return langchain_messages
 
     @staticmethod
     def __describe_image(image: Image.Image) -> str:
@@ -336,11 +323,6 @@ class EduBot:
 
         :returns: The response from GPT
         """
-        if not OPENAI_KEY:
-            raise RuntimeError(
-                "OpenAI key is not defined, make sure to supply it in the config."
-            )
-
         with Session() as session:
             thread = self.__get_thread(thread_name)
 
@@ -418,20 +400,12 @@ class EduBot:
                     }
                 )
 
-        gpt_context = self.__format_context(
+        langchain_context = self.__format_context(
             complete_context, personality_override=personality_override
         )
 
-        try:
-            response = openai.ChatCompletion.create(
-                messages=gpt_context,
-                **GPT_SETTINGS,
-            )
-        except OpenAIError as e:
-            logger.error(f"OpenAI request failed: {e}")
-            return ""
-
-        completion: str = response["choices"][0]["message"]["content"]
+        chat = ChatOpenAI(**GPT_SETTINGS)
+        completion = chat(langchain_context).content
 
         # Strip username from completion, sometimes GPT messes this up.
         completion = completion.replace(f"{self.username}:", "").lstrip()
@@ -524,6 +498,8 @@ class EduBot:
         artifacts = process_artifacts_from_answers("", "", answers, write=False)
 
         image: Image.Image | None = None
+
+        # noinspection PyBroadException
         try:
             for _, artifact in artifacts:
                 # Check that the artifact is an Image, not sure why this is necessary.
