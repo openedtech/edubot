@@ -307,13 +307,12 @@ class EduBot:
 
         return image_description
 
-    # TODO: return None on error instead of empty string.
     def gpt_answer(
         self,
         new_context: list[MessageInfo],
         thread_name: str,
         personality_override: str = None,
-    ) -> str:
+    ) -> str | None:
         """
         Use chat context to generate a GPT3 response.
 
@@ -406,6 +405,9 @@ class EduBot:
 
         chat = ChatOpenAI(**GPT_SETTINGS)
         completion = chat(langchain_context).content
+
+        if not completion:
+            return None
 
         # Strip username from completion, sometimes GPT messes this up.
         completion = completion.replace(f"{self.username}:", "").lstrip()
