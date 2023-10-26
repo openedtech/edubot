@@ -14,9 +14,10 @@ stability-sdk = "^0.8.1"
 pillow = "^9.5.0"
 beautifulsoup4 = "^4.12.2"
 trafilatura = "^1.6.0"
-replicate = "^0.8.1"
-tiktoken = "^0.4.0"
+replicate = "^0.15.4"
 langchain = "^0.0.279"
+tiktoken = "^0.5.1"
+moviepy = "^1.0.3"
 
 [tool.poetry.dev-dependencies]
 pre-commit = "^3.3.2"

@@ -32,6 +32,12 @@ if not OPENAI_KEY:
 # Add openai key to env variables for langchain
 environ["OPENAI_API_KEY"] = OPENAI_KEY
 
-DREAMSTUDIO_KEY: str | None = CONFIG.get("edubot", "dreamstudio_key", fallback=None)
+# OpenAI's library uses this env var
+environ["OPENAI_KEY"] = OPENAI_KEY
+
 REPLICATE_KEY: str | None = CONFIG.get("edubot", "replicate_key", fallback=None)
+environ["REPLICATE_API_TOKEN"] = REPLICATE_KEY
+
+DREAMSTUDIO_KEY: str | None = CONFIG.get("edubot", "dreamstudio_key", fallback=None)
+HUGGING_FACE_KEY: str | None = CONFIG.get("edubot", "hugging_face_key", fallback=None)
 DATABASE: str = CONFIG.get("edubot", "database")

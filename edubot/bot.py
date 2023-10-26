@@ -1,6 +1,7 @@
 """
 Module for AI processing tasks
 """
+
 import datetime
 import io
 import logging
@@ -403,8 +404,7 @@ class EduBot:
             complete_context, personality_override=personality_override
         )
 
-        chat = ChatOpenAI(**GPT_SETTINGS)
-        completion = chat(langchain_context).content
+        completion = LLM(langchain_context).content
 
         if not completion:
             return None
