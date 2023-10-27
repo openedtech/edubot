@@ -4,29 +4,46 @@ Audio transcription using Whisper.
 # TODO: Integrate as a plugin for Edubot
 import json
 from os import PathLike
-from pathlib import Path
-from tempfile import NamedTemporaryFile, TemporaryFile
+from tempfile import NamedTemporaryFile
 
 import replicate
 import requests
+import tiktoken
 from langchain.prompts import ChatPromptTemplate
 from moviepy.video.io.VideoFileClip import VideoFileClip
+from pydub import AudioSegment
 
 from edubot import HUGGING_FACE_KEY
 from edubot.bot import LLM
 
-prompt_template = ChatPromptTemplate.from_messages(
+transcript_prompt_template = ChatPromptTemplate.from_messages(
     [
         (
             "system",
             "You are a summarising bot. Humans provide you with transcripts from meetings and conversations. "
             "Your job is to summarise the transcripts, pulling out the key points without using the names of "
-            "the speakers in your summaries.",
+            "the speakers in your summaries. Make your summaries as brief as possible",
         ),
         (
             "human",
             "Summarise the following transcript in a few paragraphs. "
             "You must pull out the key points of discussion without using the names of the speakers. "
+            "Here is the transcript: {transcript}",
+        ),
+    ]
+)
+shortening_prompt_template = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            "You are a bot designed to reduce the length of meeting transcripts. You should remove "
+            "extraneous information from the transcripts you are provided. "
+            "DO NOT PROVIDE A SUMMARY AND MAINTAIN THE FORMATTING OF THE INPUT DATA! "
+            "Only remove personal anecdotes, greetings and unimportant pleasantries to reduce the length of the "
+            "transcript.",
+        ),
+        (
+            "human",
             "Here is the transcript: {transcript}",
         ),
     ]
@@ -59,30 +76,45 @@ class Transcriber:
 
         fp = self.video_file
 
-        temp_vid_file = NamedTemporaryFile()
+        temp_vid_file = NamedTemporaryFile(suffix=f".{self.video_file[-3:]}")
         if not self.is_local_file:
             resp = requests.get(self.video_file)
+
             temp_vid_file.write(resp.content)
-            fp = Path(temp_vid_file)
+            fp = temp_vid_file.name
 
-        audio = self.strip_audio_from_video_file(fp)
+        audio_segments = self.strip_audio_from_video_file(fp)
 
-        if not self.is_local_file:
-            temp_vid_file.close()
+        temp_vid_file.close()
 
-        self.transcript = self.__transcribe_audio(audio)
+        if len(audio_segments) == 1:
+            self.transcript = self.__transcribe_audio(audio_segments[0])
+            audio_segments[0].close()
+        else:
+            transcripts = []
+            for segment in audio_segments:
+                long_transcript = self.__transcribe_audio(segment)
+                transcripts.append(self.__shorten_transcript(long_transcript))
+                segment.close()
 
-        audio.close()
+            for t in transcripts:
+                self.transcript += t
+                self.transcript += "\n"
 
         return self.transcript
+
+    def __shorten_transcript(self, transcript):
+        return LLM(
+            shortening_prompt_template.format_messages(transcript=transcript)
+        ).content
 
     def summarise_transcript(self):
         if not self.transcript:
             self.generate_transcription()
+        return LLM(
+            transcript_prompt_template.format_messages(transcript=self.transcript)
+        ).content
 
-        return LLM(prompt_template.format_messages(transcript=self.transcript)).content
-
-    # TODO: Figure out how to process the dict returned by transcribe()
     @staticmethod
     def __transcribe_audio(audio_file: NamedTemporaryFile) -> str:
         """
@@ -105,9 +137,33 @@ class Transcriber:
         return transcript
 
     @staticmethod
-    def strip_audio_from_video_file(video_file) -> TemporaryFile:
+    def strip_audio_from_video_file(video_file) -> list[NamedTemporaryFile]:
         audio = VideoFileClip(video_file).audio
-        temp_file = NamedTemporaryFile(suffix=".wav")
+        temp_file = NamedTemporaryFile(
+            prefix="transcript_delete", suffix=".mp3", delete=False
+        )
+        audio.write_audiofile(temp_file.name)
 
-        audio.write_audiofile(temp_file.name, codec="pcm_s16le")
-        return temp_file
+        # If longer than 10 minutes cut into 10 minute slices
+        if audio.duration / 60 > 10:
+            segments = []
+            audio_segment = AudioSegment.from_file(temp_file, codec="mp3")
+
+            temp_file.delete = True
+            temp_file.close()
+
+            # Iterate through every ten minutes of the file
+            for time in range(0, int(audio_segment.duration_seconds * 1000), 600000):
+                try:
+                    audio_slice = audio_segment[time : time + 600000]
+                except IndexError:
+                    audio_slice = audio_segment[
+                        time : audio_segment.duration_seconds * 1000
+                    ]
+                slice_file_handle = NamedTemporaryFile(suffix=".mp3")
+                audio_slice.export(slice_file_handle.name, format="mp3")
+                segments.append(slice_file_handle)
+
+            return segments
+        else:
+            return [temp_file]
