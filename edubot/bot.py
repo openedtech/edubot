@@ -23,7 +23,7 @@ from edubot.sql import Bot, Completion, Message, Session, Thread
 from edubot.types import CompletionInfo, ImageInfo, MessageInfo
 
 # The limit for GPT-4 is 8192 tokens.
-MAX_GPT_TOKENS = 8192
+MAX_GPT_TOKENS = 128000
 # The maximum number of GPT tokens that chat context can be.
 MAX_PROMPT_TOKENS = MAX_GPT_TOKENS - 1192
 # The maximum number of GPT tokens that can be used for completion.
@@ -31,7 +31,7 @@ MAX_COMPLETION_TOKENS = MAX_GPT_TOKENS - MAX_PROMPT_TOKENS
 
 # Settings for GPT completion generation
 GPT_SETTINGS = {
-    "model": "gpt-4",
+    "model": "gpt-4o",
     "temperature": 0.3,
     "max_tokens": MAX_COMPLETION_TOKENS,
 }
